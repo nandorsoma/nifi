@@ -138,7 +138,8 @@ public class ListAzureBlobStorage_v12 extends AbstractListProcessor<BlobInfo> {
             LISTING_STRATEGY,
             TRACKING_STATE_CACHE,
             TRACKING_TIME_WINDOW,
-            INITIAL_LISTING_TARGET
+            INITIAL_LISTING_TARGET,
+            AzureStorageUtils.PROXY_CONFIGURATION_SERVICE
     ));
 
     private BlobServiceClient storageClient;

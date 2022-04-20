@@ -56,6 +56,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.nifi.processor.util.list.ListedEntityTracker.INITIAL_LISTING_TARGET;
 import static org.apache.nifi.processor.util.list.ListedEntityTracker.TRACKING_STATE_CACHE;
@@ -156,7 +157,9 @@ public class ListAzureDataLakeStorage extends AbstractListProcessor<ADLSFileInfo
 
     @Override
     protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
-        return PROPERTIES;
+        return Stream.of(super.getSupportedPropertyDescriptors(), PROPERTIES)
+                .flatMap(Collection::stream)
+                .collect(Collectors.collectingAndThen(Collectors.toList(), Collections::unmodifiableList));
     }
 
     @OnScheduled

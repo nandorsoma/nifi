@@ -89,6 +89,16 @@ public class ITListAzureDataLakeStorage extends AbstractAzureDataLakeStorageIT {
     }
 
     @Test
+    public void testListRootRecursiveUsingProxyConfigurationService() throws Exception {
+        runner.setProperty(AbstractAzureDataLakeStorageProcessor.DIRECTORY, "");
+        configureProxyService();
+
+        runProcessor();
+
+        assertSuccess("file1", "file2", "dir1/file11", "dir1/file12", "dir1/dir11/file111", "dir 2/file 21");
+    }
+
+    @Test
     public void testListRootNonRecursive() throws Exception {
         runner.setProperty(AbstractAzureDataLakeStorageProcessor.DIRECTORY, "");
         runner.setProperty(ListAzureDataLakeStorage.RECURSE_SUBDIRECTORIES, "false");
@@ -246,7 +256,7 @@ public class ITListAzureDataLakeStorage extends AbstractAzureDataLakeStorageIT {
         }
     }
 
-    private void assertFlowFile(TestFile testFile, MockFlowFile flowFile) throws Exception {
+    private void assertFlowFile(TestFile testFile, MockFlowFile flowFile) {
         flowFile.assertAttributeEquals(ATTR_NAME_FILESYSTEM, fileSystemName);
         flowFile.assertAttributeEquals(ATTR_NAME_FILE_PATH, testFile.getFilePath());
         flowFile.assertAttributeEquals(ATTR_NAME_DIRECTORY, testFile.getDirectory());
