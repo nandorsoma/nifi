@@ -25,29 +25,36 @@ import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
+import org.apache.nifi.annotation.lifecycle.OnScheduled;
+import org.apache.nifi.annotation.lifecycle.OnStopped;
 import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.flowfile.FlowFile;
+import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
+import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
-import org.apache.nifi.processors.azure.AbstractAzureBlobProcessor_v12;
+import org.apache.nifi.processors.azure.storage.utils.AzureBlobV12Utils;
 import org.apache.nifi.processors.azure.storage.utils.AzureStorageUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Tags({"azure", "microsoft", "cloud", "storage", "blob"})
 @SeeAlso({ListAzureBlobStorage_v12.class, FetchAzureBlobStorage_v12.class, PutAzureBlobStorage_v12.class})
 @CapabilityDescription("Deletes the specified blob from Azure Blob Storage. The processor uses Azure Blob Storage client library v12.")
 @InputRequirement(Requirement.INPUT_REQUIRED)
-public class DeleteAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
+public class DeleteAzureBlobStorage_v12 extends AbstractProcessor {
+
+    private static final Logger logger = LoggerFactory.getLogger(DeleteAzureBlobStorage_v12.class);
 
     public static final AllowableValue DELETE_SNAPSHOTS_NONE = new AllowableValue("NONE", "None", "Delete the blob only.");
 
@@ -66,17 +73,38 @@ public class DeleteAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
             .build();
 
     private static final List<PropertyDescriptor> PROPERTIES = Collections.unmodifiableList(Arrays.asList(
-            STORAGE_CREDENTIALS_SERVICE,
+            AzureStorageUtils.STORAGE_CREDENTIALS_SERVICE,
             AzureStorageUtils.CONTAINER,
-            BLOB_NAME,
-            DELETE_SNAPSHOTS_OPTION
+            AzureBlobV12Utils.BLOB_NAME,
+            DELETE_SNAPSHOTS_OPTION,
+            AzureStorageUtils.PROXY_CONFIGURATION_SERVICE
     ));
+
+    private static final Set<Relationship> RELATIONSHIPS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            AzureBlobV12Utils.REL_SUCCESS,
+            AzureBlobV12Utils.REL_FAILURE
+    )));
+
+    private BlobServiceClient storageClient;
+
+    @OnScheduled
+    public void onScheduled(ProcessContext context) {
+        storageClient = AzureBlobV12Utils.createStorageClient(context);
+    }
+
+    @OnStopped
+    public void onStopped() {
+        storageClient = null;
+    }
 
     @Override
     protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
-        return Stream.of(super.getSupportedPropertyDescriptors(), PROPERTIES)
-                .flatMap(Collection::stream)
-                .collect(Collectors.collectingAndThen(Collectors.toList(), Collections::unmodifiableList));
+        return PROPERTIES;
+    }
+
+    @Override
+    public Set<Relationship> getRelationships() {
+        return RELATIONSHIPS;
     }
 
     @Override
@@ -87,12 +115,11 @@ public class DeleteAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
         }
 
         String containerName = context.getProperty(AzureStorageUtils.CONTAINER).evaluateAttributeExpressions(flowFile).getValue();
-        String blobName = context.getProperty(BLOB_NAME).evaluateAttributeExpressions(flowFile).getValue();
+        String blobName = context.getProperty(AzureBlobV12Utils.BLOB_NAME).evaluateAttributeExpressions(flowFile).getValue();
         String deleteSnapshotsOption = context.getProperty(DELETE_SNAPSHOTS_OPTION).getValue();
 
         long startNanos = System.nanoTime();
         try {
-            BlobServiceClient storageClient = getStorageClient();
             BlobContainerClient containerClient = storageClient.getBlobContainerClient(containerName);
             BlobClient blobClient = containerClient.getBlobClient(blobName);
 
@@ -105,14 +132,14 @@ public class DeleteAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
                 provenanceMesage = "Blob does not exist, nothing to delete";
             }
 
-            session.transfer(flowFile, REL_SUCCESS);
+            session.transfer(flowFile, AzureBlobV12Utils.REL_SUCCESS);
 
             long transferMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
             session.getProvenanceReporter().invokeRemoteProcess(flowFile, blobClient.getBlobUrl(), String.format("%s (%d ms)", provenanceMesage, transferMillis));
         } catch (Exception e) {
-            getLogger().error("Failed to delete the specified blob ({}) from Azure Blob Storage. Routing to failure", blobName, e);
+            logger.error("Failed to delete the specified blob ({}) from Azure Blob Storage. Routing to failure", blobName, e);
             flowFile = session.penalize(flowFile);
-            session.transfer(flowFile, REL_FAILURE);
+            session.transfer(flowFile, AzureBlobV12Utils.REL_FAILURE);
         }
     }
 

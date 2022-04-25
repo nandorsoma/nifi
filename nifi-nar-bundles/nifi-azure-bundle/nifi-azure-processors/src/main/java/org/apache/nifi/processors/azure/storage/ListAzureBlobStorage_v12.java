@@ -40,9 +40,11 @@ import org.apache.nifi.context.PropertyContext;
 import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.flowfile.attributes.CoreAttributes;
 import org.apache.nifi.processor.ProcessContext;
+import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.processor.util.list.AbstractListProcessor;
 import org.apache.nifi.processor.util.list.ListedEntityTracker;
+import org.apache.nifi.processors.azure.storage.utils.AzureBlobV12Utils;
 import org.apache.nifi.processors.azure.storage.utils.AzureStorageUtils;
 import org.apache.nifi.processors.azure.storage.utils.BlobInfo;
 import org.apache.nifi.processors.azure.storage.utils.BlobInfo.Builder;
@@ -53,12 +55,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-import static org.apache.nifi.processors.azure.AbstractAzureBlobProcessor_v12.STORAGE_CREDENTIALS_SERVICE;
-import static org.apache.nifi.processors.azure.AbstractAzureBlobProcessor_v12.createStorageClient;
 import static org.apache.nifi.processors.azure.storage.utils.BlobAttributes.ATTR_DESCRIPTION_BLOBNAME;
 import static org.apache.nifi.processors.azure.storage.utils.BlobAttributes.ATTR_DESCRIPTION_BLOBTYPE;
 import static org.apache.nifi.processors.azure.storage.utils.BlobAttributes.ATTR_DESCRIPTION_CONTAINER;
@@ -131,7 +133,7 @@ public class ListAzureBlobStorage_v12 extends AbstractListProcessor<BlobInfo> {
             .build();
 
     private static final List<PropertyDescriptor> PROPERTIES = Collections.unmodifiableList(Arrays.asList(
-            STORAGE_CREDENTIALS_SERVICE,
+            AzureBlobV12Utils.STORAGE_CREDENTIALS_SERVICE,
             CONTAINER,
             BLOB_NAME_PREFIX,
             RECORD_WRITER,
@@ -142,6 +144,11 @@ public class ListAzureBlobStorage_v12 extends AbstractListProcessor<BlobInfo> {
             AzureStorageUtils.PROXY_CONFIGURATION_SERVICE
     ));
 
+    private static final Set<Relationship> RELATIONSHIPS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            AzureBlobV12Utils.REL_SUCCESS,
+            AzureBlobV12Utils.REL_FAILURE
+    )));
+
     private BlobServiceClient storageClient;
 
     @Override
@@ -149,9 +156,14 @@ public class ListAzureBlobStorage_v12 extends AbstractListProcessor<BlobInfo> {
         return PROPERTIES;
     }
 
+    @Override
+    public Set<Relationship> getRelationships() {
+        return RELATIONSHIPS;
+    }
+
     @OnScheduled
     public void onScheduled(ProcessContext context) {
-        storageClient = createStorageClient(context);
+        storageClient = AzureBlobV12Utils.createStorageClient(context);
     }
 
     @OnStopped
@@ -194,7 +206,7 @@ public class ListAzureBlobStorage_v12 extends AbstractListProcessor<BlobInfo> {
 
     @Override
     protected boolean isListingResetNecessary(final PropertyDescriptor property) {
-        return STORAGE_CREDENTIALS_SERVICE.equals(property)
+        return AzureStorageUtils.STORAGE_CREDENTIALS_SERVICE.equals(property)
                 || CONTAINER.equals(property)
                 || BLOB_NAME_PREFIX.equals(property)
                 || LISTING_STRATEGY.equals(property);

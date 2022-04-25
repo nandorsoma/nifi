@@ -17,6 +17,7 @@
 package org.apache.nifi.processors.azure.storage;
 
 import org.apache.nifi.processor.Processor;
+import org.apache.nifi.processors.azure.storage.utils.AzureBlobV12Utils;
 import org.apache.nifi.provenance.ProvenanceEventRecord;
 import org.apache.nifi.provenance.ProvenanceEventType;
 import org.apache.nifi.util.MockFlowFile;
@@ -41,7 +42,7 @@ public class ITFetchAzureBlobStorage_v12 extends AbstractAzureBlobStorage_v12IT 
 
     @BeforeEach
     public void setUp() {
-        runner.setProperty(DeleteAzureBlobStorage_v12.BLOB_NAME, BLOB_NAME);
+        runner.setProperty(AzureBlobV12Utils.BLOB_NAME, BLOB_NAME);
     }
 
     @Test
@@ -67,7 +68,7 @@ public class ITFetchAzureBlobStorage_v12 extends AbstractAzureBlobStorage_v12IT 
     @Test
     public void testFetchBlobWithCompoundName() throws Exception {
         String blobName = "dir1/dir2/blob1";
-        runner.setProperty(DeleteAzureBlobStorage_v12.BLOB_NAME, blobName);
+        runner.setProperty(AzureBlobV12Utils.BLOB_NAME, blobName);
         uploadBlob(blobName, BLOB_DATA);
 
         runProcessor();
@@ -187,9 +188,9 @@ public class ITFetchAzureBlobStorage_v12 extends AbstractAzureBlobStorage_v12IT 
     }
 
     private void assertFlowFile(String blobName, byte[] blobData, int originalLength) throws Exception {
-        runner.assertAllFlowFilesTransferred(FetchAzureBlobStorage_v12.REL_SUCCESS, 1);
+        runner.assertAllFlowFilesTransferred(AzureBlobV12Utils.REL_SUCCESS, 1);
 
-        MockFlowFile flowFile = runner.getFlowFilesForRelationship(FetchAzureBlobStorage_v12.REL_SUCCESS).get(0);
+        MockFlowFile flowFile = runner.getFlowFilesForRelationship(AzureBlobV12Utils.REL_SUCCESS).get(0);
 
         assertFlowFileBlobAttributes(flowFile, getContainerName(), blobName, originalLength);
 
@@ -206,9 +207,9 @@ public class ITFetchAzureBlobStorage_v12 extends AbstractAzureBlobStorage_v12IT 
     }
 
     private void assertFailure() throws Exception {
-        runner.assertAllFlowFilesTransferred(FetchAzureBlobStorage_v12.REL_FAILURE, 1);
+        runner.assertAllFlowFilesTransferred(AzureBlobV12Utils.REL_FAILURE, 1);
 
-        MockFlowFile flowFile = runner.getFlowFilesForRelationship(FetchAzureBlobStorage_v12.REL_FAILURE).get(0);
+        MockFlowFile flowFile = runner.getFlowFilesForRelationship(AzureBlobV12Utils.REL_FAILURE).get(0);
         flowFile.assertContentEquals(EMPTY_CONTENT);
     }
 }

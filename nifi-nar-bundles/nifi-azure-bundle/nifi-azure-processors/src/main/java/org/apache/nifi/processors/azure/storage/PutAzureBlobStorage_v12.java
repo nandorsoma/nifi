@@ -26,26 +26,31 @@ import org.apache.nifi.annotation.behavior.WritesAttributes;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
+import org.apache.nifi.annotation.lifecycle.OnScheduled;
+import org.apache.nifi.annotation.lifecycle.OnStopped;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.flowfile.FlowFile;
+import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
+import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
-import org.apache.nifi.processors.azure.AbstractAzureBlobProcessor_v12;
+import org.apache.nifi.processors.azure.storage.utils.AzureBlobV12Utils;
 import org.apache.nifi.processors.azure.storage.utils.AzureStorageUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.apache.nifi.processors.azure.storage.utils.BlobAttributes.ATTR_DESCRIPTION_BLOBNAME;
 import static org.apache.nifi.processors.azure.storage.utils.BlobAttributes.ATTR_DESCRIPTION_BLOBTYPE;
@@ -79,7 +84,9 @@ import static org.apache.nifi.processors.azure.storage.utils.BlobAttributes.ATTR
         @WritesAttribute(attribute = ATTR_NAME_LANG, description = ATTR_DESCRIPTION_LANG),
         @WritesAttribute(attribute = ATTR_NAME_TIMESTAMP, description = ATTR_DESCRIPTION_TIMESTAMP),
         @WritesAttribute(attribute = ATTR_NAME_LENGTH, description = ATTR_DESCRIPTION_LENGTH)})
-public class PutAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
+public class PutAzureBlobStorage_v12 extends AbstractProcessor {
+
+    private static final Logger logger = LoggerFactory.getLogger(PutAzureBlobStorage_v12.class);
 
     public static final PropertyDescriptor CREATE_CONTAINER = new PropertyDescriptor.Builder()
             .name("create-container")
@@ -95,16 +102,38 @@ public class PutAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
             .build();
 
     private static final List<PropertyDescriptor> PROPERTIES = Collections.unmodifiableList(Arrays.asList(
+            AzureBlobV12Utils.STORAGE_CREDENTIALS_SERVICE,
             AzureStorageUtils.CONTAINER,
+            AzureBlobV12Utils.BLOB_NAME,
             CREATE_CONTAINER,
-            BLOB_NAME
+            AzureStorageUtils.PROXY_CONFIGURATION_SERVICE
     ));
+
+    private static final Set<Relationship> RELATIONSHIPS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            AzureBlobV12Utils.REL_SUCCESS,
+            AzureBlobV12Utils.REL_FAILURE
+    )));
+
+    private BlobServiceClient storageClient;
+
+    @OnScheduled
+    public void onScheduled(ProcessContext context) {
+        storageClient = AzureBlobV12Utils.createStorageClient(context);
+    }
+
+    @OnStopped
+    public void onStopped() {
+        storageClient = null;
+    }
 
     @Override
     protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
-        return Stream.of(super.getSupportedPropertyDescriptors(), PROPERTIES)
-                .flatMap(Collection::stream)
-                .collect(Collectors.collectingAndThen(Collectors.toList(), Collections::unmodifiableList));
+        return PROPERTIES;
+    }
+
+    @Override
+    public Set<Relationship> getRelationships() {
+        return RELATIONSHIPS;
     }
 
     public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
@@ -115,11 +144,10 @@ public class PutAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
 
         String containerName = context.getProperty(AzureStorageUtils.CONTAINER).evaluateAttributeExpressions(flowFile).getValue();
         boolean createContainer = context.getProperty(CREATE_CONTAINER).asBoolean();
-        String blobName = context.getProperty(BLOB_NAME).evaluateAttributeExpressions(flowFile).getValue();
+        String blobName = context.getProperty(AzureBlobV12Utils.BLOB_NAME).evaluateAttributeExpressions(flowFile).getValue();
 
         long startNanos = System.nanoTime();
         try {
-            BlobServiceClient storageClient = getStorageClient();
             BlobContainerClient containerClient = storageClient.getBlobContainerClient(containerName);
             if (createContainer && !containerClient.exists()) {
                 containerClient.create();
@@ -133,18 +161,18 @@ public class PutAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
                 blobClient.upload(bufferedIn, length);
             }
 
-            Map<String, String> attributes = createBlobAttributesMap(blobClient);
+            Map<String, String> attributes = AzureBlobV12Utils.createBlobAttributesMap(blobClient);
             flowFile = session.putAllAttributes(flowFile, attributes);
 
-            session.transfer(flowFile, REL_SUCCESS);
+            session.transfer(flowFile, AzureBlobV12Utils.REL_SUCCESS);
 
             long transferMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
             String transitUri = attributes.get(ATTR_NAME_PRIMARY_URI);
             session.getProvenanceReporter().send(flowFile, transitUri, transferMillis);
         } catch (Exception e) {
-            getLogger().error("Failed to create blob on Azure Blob Storage", e);
+            logger.error("Failed to create blob on Azure Blob Storage", e);
             flowFile = session.penalize(flowFile);
-            session.transfer(flowFile, REL_FAILURE);
+            session.transfer(flowFile, AzureBlobV12Utils.REL_FAILURE);
         }
     }
 }

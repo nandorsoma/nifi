@@ -22,8 +22,8 @@ import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.models.BlobType;
 import com.azure.storage.common.StorageSharedKeyCredential;
-import org.apache.nifi.processors.azure.AbstractAzureBlobProcessor_v12;
 import org.apache.nifi.processors.azure.AzureServiceEndpoints;
+import org.apache.nifi.processors.azure.storage.utils.AzureBlobV12Utils;
 import org.apache.nifi.processors.azure.storage.utils.AzureStorageUtils;
 import org.apache.nifi.processors.azure.storage.utils.BlobAttributes;
 import org.apache.nifi.services.azure.storage.AzureStorageCredentialsControllerService_v12;
@@ -74,7 +74,7 @@ public abstract class AbstractAzureBlobStorage_v12IT extends AbstractAzureStorag
         runner.setProperty(service, AzureStorageCredentialsControllerService_v12.ACCOUNT_KEY, getAccountKey());
         runner.enableControllerService(service);
 
-        runner.setProperty(AbstractAzureBlobProcessor_v12.STORAGE_CREDENTIALS_SERVICE, serviceId);
+        runner.setProperty(AzureBlobV12Utils.STORAGE_CREDENTIALS_SERVICE, serviceId);
     }
 
     @BeforeEach
@@ -131,7 +131,7 @@ public abstract class AbstractAzureBlobStorage_v12IT extends AbstractAzureStorag
         attributes.put(EL_BLOB_NAME, BLOB_NAME);
 
         runner.setProperty(AzureStorageUtils.CONTAINER, String.format("${%s}", EL_CONTAINER_NAME));
-        runner.setProperty(AbstractAzureBlobProcessor_v12.BLOB_NAME, String.format("${%s}", EL_BLOB_NAME));
+        runner.setProperty(AzureBlobV12Utils.BLOB_NAME, String.format("${%s}", EL_BLOB_NAME));
 
         return attributes;
     }

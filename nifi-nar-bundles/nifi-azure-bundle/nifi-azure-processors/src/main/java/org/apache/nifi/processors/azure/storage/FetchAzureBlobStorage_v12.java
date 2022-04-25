@@ -27,25 +27,30 @@ import org.apache.nifi.annotation.behavior.WritesAttributes;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.SeeAlso;
 import org.apache.nifi.annotation.documentation.Tags;
+import org.apache.nifi.annotation.lifecycle.OnScheduled;
+import org.apache.nifi.annotation.lifecycle.OnStopped;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.flowfile.FlowFile;
+import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.DataUnit;
 import org.apache.nifi.processor.ProcessContext;
 import org.apache.nifi.processor.ProcessSession;
+import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
-import org.apache.nifi.processors.azure.AbstractAzureBlobProcessor_v12;
+import org.apache.nifi.processors.azure.storage.utils.AzureBlobV12Utils;
 import org.apache.nifi.processors.azure.storage.utils.AzureStorageUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.apache.nifi.processors.azure.storage.utils.BlobAttributes.ATTR_DESCRIPTION_BLOBNAME;
 import static org.apache.nifi.processors.azure.storage.utils.BlobAttributes.ATTR_DESCRIPTION_BLOBTYPE;
@@ -79,7 +84,9 @@ import static org.apache.nifi.processors.azure.storage.utils.BlobAttributes.ATTR
         @WritesAttribute(attribute = ATTR_NAME_LANG, description = ATTR_DESCRIPTION_LANG),
         @WritesAttribute(attribute = ATTR_NAME_TIMESTAMP, description = ATTR_DESCRIPTION_TIMESTAMP),
         @WritesAttribute(attribute = ATTR_NAME_LENGTH, description = ATTR_DESCRIPTION_LENGTH)})
-public class FetchAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
+public class FetchAzureBlobStorage_v12 extends AbstractProcessor {
+
+    private static final Logger logger = LoggerFactory.getLogger(FetchAzureBlobStorage_v12.class);
 
     public static final PropertyDescriptor CONTAINER = new PropertyDescriptor.Builder()
             .fromPropertyDescriptor(AzureStorageUtils.CONTAINER)
@@ -87,7 +94,7 @@ public class FetchAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
             .build();
 
     public static final PropertyDescriptor BLOB_NAME = new PropertyDescriptor.Builder()
-            .fromPropertyDescriptor(AbstractAzureBlobProcessor_v12.BLOB_NAME)
+            .fromPropertyDescriptor(AzureBlobV12Utils.BLOB_NAME)
             .defaultValue("${azure.blobname}")
             .build();
 
@@ -118,11 +125,31 @@ public class FetchAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
             RANGE_LENGTH
     ));
 
+    private static final Set<Relationship> RELATIONSHIPS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            AzureBlobV12Utils.REL_SUCCESS,
+            AzureBlobV12Utils.REL_FAILURE
+    )));
+
+    private BlobServiceClient storageClient;
+
+    @OnScheduled
+    public void onScheduled(ProcessContext context) {
+        storageClient = AzureBlobV12Utils.createStorageClient(context);
+    }
+
+    @OnStopped
+    public void onStopped() {
+        storageClient = null;
+    }
+
     @Override
     protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
-        return Stream.of(super.getSupportedPropertyDescriptors(), PROPERTIES)
-                .flatMap(Collection::stream)
-                .collect(Collectors.collectingAndThen(Collectors.toList(), Collections::unmodifiableList));
+        return PROPERTIES;
+    }
+
+    @Override
+    public Set<Relationship> getRelationships() {
+        return RELATIONSHIPS;
     }
 
     @Override
@@ -140,24 +167,23 @@ public class FetchAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
         Long rangeLength = (context.getProperty(RANGE_LENGTH).isSet() ? context.getProperty(RANGE_LENGTH).evaluateAttributeExpressions(flowFile).asDataSize(DataUnit.B).longValue() : null);
 
         try {
-            BlobServiceClient storageClient = getStorageClient();
             BlobContainerClient containerClient = storageClient.getBlobContainerClient(containerName);
             BlobClient blobClient = containerClient.getBlobClient(blobName);
 
             flowFile = session.write(flowFile, os -> blobClient.downloadWithResponse(os, new BlobRange(rangeStart, rangeLength), null, null, false, null, null));
 
-            Map<String, String> attributes = createBlobAttributesMap(blobClient);
+            Map<String, String> attributes = AzureBlobV12Utils.createBlobAttributesMap(blobClient);
             flowFile = session.putAllAttributes(flowFile, attributes);
 
-            session.transfer(flowFile, REL_SUCCESS);
+            session.transfer(flowFile, AzureBlobV12Utils.REL_SUCCESS);
 
             long transferMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
             String transitUri = attributes.get(ATTR_NAME_PRIMARY_URI);
             session.getProvenanceReporter().fetch(flowFile, transitUri, transferMillis);
         } catch (Exception e) {
-            getLogger().error("Failure to fetch Azure blob {}", blobName, e);
+            logger.error("Failure to fetch Azure blob {}", blobName, e);
             flowFile = session.penalize(flowFile);
-            session.transfer(flowFile, REL_FAILURE);
+            session.transfer(flowFile, AzureBlobV12Utils.REL_FAILURE);
         }
     }
 }

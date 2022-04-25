@@ -20,6 +20,7 @@ import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.specialized.BlobClientBase;
 import org.apache.nifi.processor.Processor;
 import org.apache.nifi.processor.Relationship;
+import org.apache.nifi.processors.azure.storage.utils.AzureBlobV12Utils;
 import org.apache.nifi.provenance.ProvenanceEventRecord;
 import org.apache.nifi.provenance.ProvenanceEventType;
 import org.apache.nifi.util.MockFlowFile;
@@ -44,7 +45,7 @@ public class ITDeleteAzureBlobStorage_v12 extends AbstractAzureBlobStorage_v12IT
 
     @BeforeEach
     public void setUp() {
-        runner.setProperty(DeleteAzureBlobStorage_v12.BLOB_NAME, BLOB_NAME);
+        runner.setProperty(AzureBlobV12Utils.BLOB_NAME, BLOB_NAME);
     }
 
     @Test
@@ -70,7 +71,7 @@ public class ITDeleteAzureBlobStorage_v12 extends AbstractAzureBlobStorage_v12IT
     @Test
     public void testDeleteBlobWithCompoundName() throws Exception {
         String blobName = "dir1/dir2/blob1";
-        runner.setProperty(DeleteAzureBlobStorage_v12.BLOB_NAME, blobName);
+        runner.setProperty(AzureBlobV12Utils.BLOB_NAME, blobName);
         uploadBlob(blobName, BLOB_DATA);
 
         runProcessor();
@@ -88,7 +89,7 @@ public class ITDeleteAzureBlobStorage_v12 extends AbstractAzureBlobStorage_v12IT
     @Test
     public void testDeleteBlobWithSpacesInBlobName() throws Exception {
         String blobName = "dir 1/blob 1";
-        runner.setProperty(DeleteAzureBlobStorage_v12.BLOB_NAME, blobName);
+        runner.setProperty(AzureBlobV12Utils.BLOB_NAME, blobName);
         uploadBlob(blobName, BLOB_DATA);
 
         runProcessor();
@@ -142,7 +143,7 @@ public class ITDeleteAzureBlobStorage_v12 extends AbstractAzureBlobStorage_v12IT
 
         runProcessor();
 
-        assertFlowFile(DeleteAzureBlobStorage_v12.REL_SUCCESS);
+        assertFlowFile(AzureBlobV12Utils.REL_SUCCESS);
         assertTrue(blobClient.exists());
         assertFalse(snapshotClient.exists());
         assertProvenanceEvents();
@@ -159,13 +160,13 @@ public class ITDeleteAzureBlobStorage_v12 extends AbstractAzureBlobStorage_v12IT
     }
 
     private void assertSuccess(String blobName) throws Exception {
-        assertFlowFile(DeleteAzureBlobStorage_v12.REL_SUCCESS);
+        assertFlowFile(AzureBlobV12Utils.REL_SUCCESS);
         assertAzureBlob(blobName, false);
         assertProvenanceEvents();
     }
 
     private void assertFailure(String blobName) throws Exception {
-        assertFlowFile(DeleteAzureBlobStorage_v12.REL_FAILURE);
+        assertFlowFile(AzureBlobV12Utils.REL_FAILURE);
         assertAzureBlob(blobName, true);
     }
 
