@@ -17,7 +17,6 @@
 package org.apache.nifi.processors.azure.storage;
 
 import com.azure.storage.blob.BlobContainerClient;
-import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.models.BlobItem;
 import com.azure.storage.blob.models.BlobItemProperties;
 import com.azure.storage.blob.models.ListBlobsOptions;
@@ -58,7 +57,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.nifi.processors.azure.AbstractAzureBlobProcessor_v12.STORAGE_CREDENTIALS_SERVICE;
-import static org.apache.nifi.processors.azure.AbstractAzureBlobProcessor_v12.createStorageClient;
 import static org.apache.nifi.processors.azure.storage.utils.BlobAttributes.ATTR_DESCRIPTION_BLOBNAME;
 import static org.apache.nifi.processors.azure.storage.utils.BlobAttributes.ATTR_DESCRIPTION_BLOBTYPE;
 import static org.apache.nifi.processors.azure.storage.utils.BlobAttributes.ATTR_DESCRIPTION_CONTAINER;
@@ -142,7 +140,7 @@ public class ListAzureBlobStorage_v12 extends AbstractListProcessor<BlobInfo> {
             AzureStorageUtils.PROXY_CONFIGURATION_SERVICE
     ));
 
-    private BlobServiceClient storageClient;
+    private BlobContainerClientFactory blobContainerClientFactory;
 
     @Override
     protected List<PropertyDescriptor> getSupportedPropertyDescriptors() {
@@ -151,12 +149,12 @@ public class ListAzureBlobStorage_v12 extends AbstractListProcessor<BlobInfo> {
 
     @OnScheduled
     public void onScheduled(ProcessContext context) {
-        storageClient = createStorageClient(context);
+        blobContainerClientFactory = new BlobContainerClientFactory();
     }
 
     @OnStopped
     public void onStopped() {
-        storageClient = null;
+        blobContainerClientFactory = null;
     }
 
     @Override
@@ -209,7 +207,8 @@ public class ListAzureBlobStorage_v12 extends AbstractListProcessor<BlobInfo> {
         try {
             final List<BlobInfo> listing = new ArrayList<>();
 
-            final BlobContainerClient containerClient = storageClient.getBlobContainerClient(containerName);
+            //TODO: blobName doesnt make sense here
+            final BlobContainerClient containerClient = blobContainerClientFactory.getClient(context, containerName, null);
 
             final ListBlobsOptions options = new ListBlobsOptions()
                     .setPrefix(prefix);

@@ -100,6 +100,7 @@ public abstract class AbstractAzureBlobProcessor extends AbstractProcessor {
 
         final String cseKeyId = context.getProperty(AzureBlobClientSideEncryptionUtils.CSE_KEY_ID).getValue();
 
+        // itt configolja.
         final String cseSymmetricKeyHex = context.getProperty(AzureBlobClientSideEncryptionUtils.CSE_SYMMETRIC_KEY_HEX).getValue();
 
         BlobRequestOptions blobRequestOptions = new BlobRequestOptions();

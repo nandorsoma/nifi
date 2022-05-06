@@ -18,7 +18,6 @@ package org.apache.nifi.processors.azure.storage;
 
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
-import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.models.BlobRange;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
@@ -140,8 +139,7 @@ public class FetchAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
         Long rangeLength = (context.getProperty(RANGE_LENGTH).isSet() ? context.getProperty(RANGE_LENGTH).evaluateAttributeExpressions(flowFile).asDataSize(DataUnit.B).longValue() : null);
 
         try {
-            BlobServiceClient storageClient = getStorageClient();
-            BlobContainerClient containerClient = storageClient.getBlobContainerClient(containerName);
+            BlobContainerClient containerClient = getStorageClient(context, containerName, blobName);
             BlobClient blobClient = containerClient.getBlobClient(blobName);
 
             flowFile = session.write(flowFile, os -> blobClient.downloadWithResponse(os, new BlobRange(rangeStart, rangeLength), null, null, false, null, null));

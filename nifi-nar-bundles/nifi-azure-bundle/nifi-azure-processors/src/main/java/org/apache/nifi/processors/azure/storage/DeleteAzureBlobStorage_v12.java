@@ -18,7 +18,6 @@ package org.apache.nifi.processors.azure.storage;
 
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
-import com.azure.storage.blob.BlobServiceClient;
 import com.azure.storage.blob.models.DeleteSnapshotsOptionType;
 import org.apache.nifi.annotation.behavior.InputRequirement;
 import org.apache.nifi.annotation.behavior.InputRequirement.Requirement;
@@ -92,8 +91,7 @@ public class DeleteAzureBlobStorage_v12 extends AbstractAzureBlobProcessor_v12 {
 
         long startNanos = System.nanoTime();
         try {
-            BlobServiceClient storageClient = getStorageClient();
-            BlobContainerClient containerClient = storageClient.getBlobContainerClient(containerName);
+            BlobContainerClient containerClient = getStorageClient(context, containerName, blobName);
             BlobClient blobClient = containerClient.getBlobClient(blobName);
 
             String provenanceMesage;

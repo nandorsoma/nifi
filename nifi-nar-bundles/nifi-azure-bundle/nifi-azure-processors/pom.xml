@@ -25,6 +25,8 @@
         <azure-keyvault.version>1.2.6</azure-keyvault.version>
         <azure-storage-file-datalake.version>12.7.4</azure-storage-file-datalake.version>
         <azure-storage-blob.version>12.14.4</azure-storage-blob.version>
+        <azure-storage-blob-cryptography.version>12.14.1</azure-storage-blob-cryptography.version><!-- TODO: upgrade? 12.15.1-->
+        <azure-security-keyvault-keys.version>4.3.8</azure-security-keyvault-keys.version>
     </properties>
     <dependencies>
         <dependency>
@@ -119,6 +121,22 @@
                     <artifactId>azure-core</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-storage-blob-cryptography</artifactId>
+            <version>${azure-storage-blob-cryptography.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.azure</groupId>
+                    <artifactId>azure-core</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-security-keyvault-keys</artifactId>
+            <version>${azure-security-keyvault-keys.version}</version>
         </dependency>
         <dependency>
             <groupId>com.azure</groupId>
