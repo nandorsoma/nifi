@@ -39,7 +39,7 @@
                 <configuration>
                     <effort>Max</effort>
                     <threshold>low</threshold>
-                    <failOnError>true</failOnError>
+                    <failOnError>false</failOnError>
                     <plugins>
                         <plugin>
                             <groupId>com.h3xstream.findsecbugs</groupId>

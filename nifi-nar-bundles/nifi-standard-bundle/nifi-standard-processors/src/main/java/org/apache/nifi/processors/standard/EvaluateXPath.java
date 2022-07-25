@@ -56,6 +56,7 @@ import org.apache.nifi.annotation.behavior.WritesAttribute;
 import org.apache.nifi.annotation.documentation.CapabilityDescription;
 import org.apache.nifi.annotation.documentation.Tags;
 import org.apache.nifi.annotation.lifecycle.OnScheduled;
+import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
@@ -70,6 +71,7 @@ import org.apache.nifi.processor.ProcessorInitializationContext;
 import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processors.standard.xml.DocumentTypeAllowedDocumentProvider;
+import org.apache.nifi.processors.standard.xml.DocumentTypeIgnoredDocumentProvider;
 import org.apache.nifi.xml.processing.ProcessingException;
 import org.apache.nifi.xml.processing.parsers.StandardDocumentProvider;
 import org.apache.nifi.xml.processing.transform.StandardTransformProvider;
@@ -109,6 +111,14 @@ public class EvaluateXPath extends AbstractProcessor {
     public static final String RETURN_TYPE_NODESET = "nodeset";
     public static final String RETURN_TYPE_STRING = "string";
 
+    public static final AllowableValue DISALLOW_DTD =
+            new AllowableValue("false", "False", "Disallow DTD");
+    public static final AllowableValue ALLOW_EMBEDDED_DTD =
+            new AllowableValue("true", "Allow Embedded", "Allow embedded Document Type Declaration which is used for validation.");
+    public static final AllowableValue IGNORE_DTD =
+            new AllowableValue("ignore", "Ignore", "Ignoring Document Type Declaration in XML regardless it is embedded or external.");
+
+
     public static final PropertyDescriptor DESTINATION = new PropertyDescriptor.Builder()
             .name("Destination")
             .description("Indicates whether the results of the XPath evaluation are written to the FlowFile content or a FlowFile attribute; "
@@ -134,7 +144,10 @@ public class EvaluateXPath extends AbstractProcessor {
             .description("Allow embedded Document Type Declaration in XML. "
                     + "This feature should be disabled to avoid XML entity expansion vulnerabilities.")
             .required(true)
-            .allowableValues("true", "false")
+            .allowableValues(
+                    DISALLOW_DTD,
+                    ALLOW_EMBEDDED_DTD,
+                    IGNORE_DTD)
             .defaultValue("false")
             .build();
 
@@ -273,7 +286,7 @@ public class EvaluateXPath extends AbstractProcessor {
                 throw new IllegalStateException("There are no other return types...");
         }
 
-        final boolean validatingDeclaration = context.getProperty(VALIDATE_DTD).asBoolean();
+        final String validatingDeclaration = context.getProperty(VALIDATE_DTD).getValue();
 
         final StandardTransformProvider transformProvider = new StandardTransformProvider();
         transformProvider.setIndent(true);
@@ -285,9 +298,17 @@ public class EvaluateXPath extends AbstractProcessor {
             try {
                 session.read(flowFile, rawIn -> {
                     try (final InputStream in = new BufferedInputStream(rawIn)) {
-                        final StandardDocumentProvider documentProvider = validatingDeclaration
-                                ? new DocumentTypeAllowedDocumentProvider()
-                                : new StandardDocumentProvider();
+                        StandardDocumentProvider documentProvider;
+                        if (DISALLOW_DTD.getValue().equals(validatingDeclaration)) {
+                            documentProvider = new StandardDocumentProvider();
+                        } else if (ALLOW_EMBEDDED_DTD.getValue().equals(validatingDeclaration)) {
+                            documentProvider = new DocumentTypeAllowedDocumentProvider();
+                        } else if (IGNORE_DTD.getValue().equals(validatingDeclaration)) {
+                            documentProvider = new DocumentTypeIgnoredDocumentProvider();
+                        } else {
+                            throw new IllegalStateException("Unexpected value: " + validatingDeclaration);
+                        }
+
                         final Document document = documentProvider.parse(in);
                         sourceRef.set(new DOMSource(document));
                     }

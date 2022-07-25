@@ -35,6 +35,8 @@ public class TestEvaluateXPath {
     private static final Path XML_SNIPPET = Paths.get("src/test/resources/TestXml/xml-snippet.xml");
     private static final Path XML_SNIPPET_EMBEDDED_DOCTYPE = Paths.get("src/test/resources/TestXml/xml-snippet-embedded-doctype.xml");
     private static final Path XML_SNIPPET_NONEXISTENT_DOCTYPE = Paths.get("src/test/resources/TestXml/xml-snippet-external-doctype.xml");
+    //TODO create external file for that
+    private static final Path XML_SNIPPET_EXTERNAL_DOCTYPE = Paths.get("src/test/resources/TestXml/xml-snippet-external-doctype.xml");
 
     @Test
     public void testAsAttribute() throws IOException {
@@ -212,5 +214,19 @@ public class TestEvaluateXPath {
         testRunner.run();
 
         testRunner.assertAllFlowFilesTransferred(EvaluateXPath.REL_FAILURE, 1);
+    }
+
+    @Test
+    public void testSuccessForExternalDocTypeWithIgnoreDocType() throws IOException {
+        final TestRunner testRunner = TestRunners.newTestRunner(new EvaluateXPath());
+        testRunner.setProperty(EvaluateXPath.DESTINATION, EvaluateXPath.DESTINATION_CONTENT);
+        testRunner.setProperty(EvaluateXPath.RETURN_TYPE, EvaluateXPath.RETURN_TYPE_STRING);
+        testRunner.setProperty("some.property", "/*:bundle/node/subNode[1]/value/text()");
+        testRunner.setProperty(EvaluateXPath.VALIDATE_DTD, EvaluateXPath.IGNORE_DTD.getValue());
+
+        testRunner.enqueue(XML_SNIPPET_EXTERNAL_DOCTYPE);
+        testRunner.run();
+
+        testRunner.assertAllFlowFilesTransferred(EvaluateXPath.REL_MATCH, 1);
     }
 }

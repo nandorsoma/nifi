@@ -73,8 +73,7 @@ public class StandardDocumentProvider implements DocumentProvider {
         final DocumentBuilderFactory documentBuilderFactory = getDocumentBuilderFactory();
 
         try {
-            documentBuilderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, ProcessingFeature.SECURE_PROCESSING.isEnabled());
-            documentBuilderFactory.setFeature(ProcessingFeature.DISALLOW_DOCTYPE_DECL.getFeature(), ProcessingFeature.DISALLOW_DOCTYPE_DECL.isEnabled());
+            setFeatures(documentBuilderFactory);
 
             final DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
             documentBuilder.setErrorHandler(errorHandler);
@@ -96,8 +95,7 @@ public class StandardDocumentProvider implements DocumentProvider {
         final DocumentBuilderFactory documentBuilderFactory = getDocumentBuilderFactory();
 
         try {
-            documentBuilderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, ProcessingFeature.SECURE_PROCESSING.isEnabled());
-            documentBuilderFactory.setFeature(ProcessingFeature.DISALLOW_DOCTYPE_DECL.getFeature(), isDisallowDocumentTypeDeclaration());
+            setFeatures(documentBuilderFactory);
 
             final DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
             documentBuilder.setErrorHandler(errorHandler);
@@ -108,8 +106,9 @@ public class StandardDocumentProvider implements DocumentProvider {
         }
     }
 
-    protected boolean isDisallowDocumentTypeDeclaration() {
-        return ProcessingFeature.DISALLOW_DOCTYPE_DECL.isEnabled();
+    protected void setFeatures(DocumentBuilderFactory documentBuilderFactory) throws ParserConfigurationException {
+        documentBuilderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, ProcessingFeature.SECURE_PROCESSING.isEnabled());
+        documentBuilderFactory.setFeature(ProcessingFeature.DISALLOW_DOCTYPE_DECL.getFeature(), ProcessingFeature.DISALLOW_DOCTYPE_DECL.isEnabled());
     }
 
     private DocumentBuilderFactory getDocumentBuilderFactory() {
