@@ -16,6 +16,7 @@
  */
 package org.apache.nifi.xml.processing.parsers;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.nifi.xml.processing.ProcessingException;
 import org.apache.nifi.xml.processing.ProcessingFeature;
 import org.w3c.dom.Document;
@@ -89,6 +90,10 @@ public class StandardDocumentProvider implements DocumentProvider {
      *
      * @return DocumentBuilder configured using provided properties
      */
+    @SuppressFBWarnings(
+            value = "XXE_DOCUMENT",
+            justification = "XML External Entity attacks are prevented by specifying SECURE_PROCESSING and DISALLOW_DOCTYPE_DECL features in the setFeatures method."
+    )
     @Override
     public Document parse(final InputStream inputStream) {
         Objects.requireNonNull(inputStream, "InputStream required");

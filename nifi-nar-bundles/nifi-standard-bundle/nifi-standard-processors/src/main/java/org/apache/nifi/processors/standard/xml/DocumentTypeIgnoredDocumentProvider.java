@@ -34,8 +34,6 @@ public class DocumentTypeIgnoredDocumentProvider extends StandardDocumentProvide
     protected void setFeatures(DocumentBuilderFactory documentBuilderFactory) throws ParserConfigurationException {
         documentBuilderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, ProcessingFeature.SECURE_PROCESSING.isEnabled());
         documentBuilderFactory.setFeature(ProcessingFeature.DISALLOW_DOCTYPE_DECL.getFeature(), false);
-        documentBuilderFactory.setFeature(ProcessingFeature.SAX_VALIDATION.getFeature(), false);
-        documentBuilderFactory.setFeature(ProcessingFeature.LOAD_DOCTYPE_GRAMMAR.getFeature(), false);
         documentBuilderFactory.setFeature(ProcessingFeature.LOAD_EXTERNAL_DOCTYPE.getFeature(), false);
     }
 }

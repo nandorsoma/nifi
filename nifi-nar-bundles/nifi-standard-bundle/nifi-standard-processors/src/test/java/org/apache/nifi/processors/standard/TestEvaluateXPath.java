@@ -34,8 +34,7 @@ public class TestEvaluateXPath {
 
     private static final Path XML_SNIPPET = Paths.get("src/test/resources/TestXml/xml-snippet.xml");
     private static final Path XML_SNIPPET_EMBEDDED_DOCTYPE = Paths.get("src/test/resources/TestXml/xml-snippet-embedded-doctype.xml");
-    private static final Path XML_SNIPPET_NONEXISTENT_DOCTYPE = Paths.get("src/test/resources/TestXml/xml-snippet-external-doctype.xml");
-    //TODO create external file for that
+    private static final Path XML_SNIPPET_NONEXISTENT_DOCTYPE = Paths.get("src/test/resources/TestXml/xml-snippet-non-existent-doctype.xml");
     private static final Path XML_SNIPPET_EXTERNAL_DOCTYPE = Paths.get("src/test/resources/TestXml/xml-snippet-external-doctype.xml");
 
     @Test

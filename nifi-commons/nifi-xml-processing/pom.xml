@@ -22,12 +22,21 @@
     </parent>
     <artifactId>nifi-xml-processing</artifactId>
     <packaging>jar</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs-annotations</artifactId>
+            <version>4.7.1</version>
+        </dependency>
+    </dependencies>
+
     <build>
         <plugins>
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>4.6.0.0</version>
+                <version>4.7.1.1</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -39,7 +48,7 @@
                 <configuration>
                     <effort>Max</effort>
                     <threshold>low</threshold>
-                    <failOnError>false</failOnError>
+                    <failOnError>true</failOnError>
                     <plugins>
                         <plugin>
                             <groupId>com.h3xstream.findsecbugs</groupId>
