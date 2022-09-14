@@ -44,6 +44,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.EnumUtils.isValidEnumIgnoreCase;
@@ -124,11 +125,13 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
 
     public static final PropertyDescriptor PROP_BROKER_URI = new PropertyDescriptor.Builder()
             .name("Broker URI")
+            .displayName("Broker URI 2")
             .description("The URI to use to connect to the MQTT broker (e.g. tcp://localhost:1883). The 'tcp', 'ssl', 'ws' and 'wss' schemes are supported. In order to use 'ssl', the SSL Context " +
                     "Service property must be set.")
             .required(true)
             .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
-            .addValidator(BROKER_VALIDATOR)
+            .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+//            .addValidator(BROKER_VALIDATOR)
             .build();
 
     public static final PropertyDescriptor PROP_CLIENTID = new PropertyDescriptor.Builder()
@@ -370,11 +373,11 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
     protected MqttClientProperties getMqttClientProperties(final ProcessContext context) {
         final MqttClientProperties clientProperties = new MqttClientProperties();
 
-        try {
-            clientProperties.setBrokerUri(new URI(context.getProperty(PROP_BROKER_URI).evaluateAttributeExpressions().getValue()));
-        } catch (URISyntaxException e) {
-            throw new IllegalArgumentException("Invalid Broker URI", e);
-        }
+        String brokerUris = context.getProperty(PROP_BROKER_URI).evaluateAttributeExpressions().getValue();
+        List<URI> uris = Pattern.compile(",").splitAsStream(brokerUris)
+                .map(this::parseUri)
+                .collect(Collectors.toList());
+        clientProperties.setBrokerUris(uris);
 
         String clientId = context.getProperty(PROP_CLIENTID).evaluateAttributeExpressions().getValue();
         if (clientId == null) {
@@ -409,5 +412,13 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
         clientProperties.setPassword(context.getProperty(PROP_PASSWORD).getValue());
 
         return clientProperties;
+    }
+
+    private URI parseUri(String uri) {
+        try {
+            return new URI(uri);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Invalid Broker URI", e);
+        }
     }
 }

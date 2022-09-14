@@ -30,6 +30,8 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
+import java.net.URI;
+import java.util.List;
 import java.util.Properties;
 
 public class PahoMqttClientAdapter implements MqttClient {
@@ -62,6 +64,13 @@ public class PahoMqttClientAdapter implements MqttClient {
             connectOptions.setKeepAliveInterval(clientProperties.getKeepAliveInterval());
             connectOptions.setMqttVersion(clientProperties.getMqttVersion().getVersionCode());
             connectOptions.setConnectionTimeout(clientProperties.getConnectionTimeout());
+
+            List<URI> uris = clientProperties.getBrokerUris();
+            if (uris.size() > 1) {
+                String[] uriArray = uris.stream().map(URI::toString).toArray(String[]::new);
+                connectOptions.setServerURIs(uriArray);
+            }
+            connectOptions.setAutomaticReconnect(true);
 
             final TlsConfiguration tlsConfiguration = clientProperties.getTlsConfiguration();
             if (tlsConfiguration != null) {
@@ -182,7 +191,7 @@ public class PahoMqttClientAdapter implements MqttClient {
         logger.debug("Creating Mqtt v3 client");
 
         try {
-            return new org.eclipse.paho.client.mqttv3.MqttClient(clientProperties.getBroker(), clientProperties.getClientId(), new MemoryPersistence());
+            return new org.eclipse.paho.client.mqttv3.MqttClient(clientProperties.getBrokerUris().get(0).toString(), clientProperties.getClientId(), new MemoryPersistence());
         } catch (org.eclipse.paho.client.mqttv3.MqttException e) {
             throw new MqttException("An error has occurred during creating adapter for MQTT v3 client", e);
         }

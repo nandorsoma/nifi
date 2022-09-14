@@ -29,10 +29,12 @@ import org.apache.nifi.processors.mqtt.common.MqttClient;
 import org.apache.nifi.processors.mqtt.common.MqttClientProperties;
 import org.apache.nifi.processors.mqtt.common.MqttException;
 import org.apache.nifi.processors.mqtt.common.ReceivedMqttMessage;
+import org.apache.nifi.processors.mqtt.common.RoundRobinList;
 import org.apache.nifi.processors.mqtt.common.StandardMqttMessage;
 import org.apache.nifi.security.util.KeyStoreUtils;
 import org.apache.nifi.security.util.TlsException;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -44,6 +46,7 @@ import static org.apache.nifi.processors.mqtt.common.MqttProtocolScheme.WSS;
 
 public class HiveMqV5ClientAdapter implements MqttClient {
 
+    private final RoundRobinList<URI> brokers;
     private final Mqtt5BlockingClient mqtt5BlockingClient;
     private final MqttClientProperties clientProperties;
     private final ComponentLog logger;
@@ -51,6 +54,7 @@ public class HiveMqV5ClientAdapter implements MqttClient {
     private MqttCallback callback;
 
     public HiveMqV5ClientAdapter(MqttClientProperties clientProperties, ComponentLog logger) throws TlsException {
+        this.brokers = new RoundRobinList<>(clientProperties.getBrokerUris());
         this.mqtt5BlockingClient = createClient(clientProperties, logger);
         this.clientProperties = clientProperties;
         this.logger = logger;
@@ -127,7 +131,7 @@ public class HiveMqV5ClientAdapter implements MqttClient {
 
         logger.debug("Subscribing to {} with QoS: {}", topicFilter, qos);
 
-        CompletableFuture<Mqtt5SubAck> futureAck = mqtt5BlockingClient.toAsync().subscribeWith()
+        final CompletableFuture<Mqtt5SubAck> futureAck = mqtt5BlockingClient.toAsync().subscribeWith()
                 .topicFilter(topicFilter)
                 .qos(Objects.requireNonNull(MqttQos.fromCode(qos)))
                 .callback(mqtt5Publish -> {
@@ -143,7 +147,7 @@ public class HiveMqV5ClientAdapter implements MqttClient {
         // Setting "listener" callback is only possible with async client, though sending subscribe message
         // should happen in a blocking way to make sure the processor is blocked until ack is not arrived.
         try {
-            Mqtt5SubAck ack = futureAck.get(clientProperties.getConnectionTimeout(), TimeUnit.SECONDS);
+            final Mqtt5SubAck ack = futureAck.get(clientProperties.getConnectionTimeout(), TimeUnit.SECONDS);
             logger.debug("Received mqtt5 subscribe ack: {}", ack);
         } catch (Exception e) {
             throw new MqttException("An error has occurred during sending subscribe message to broker", e);
@@ -155,14 +159,26 @@ public class HiveMqV5ClientAdapter implements MqttClient {
         this.callback = callback;
     }
 
-    private static Mqtt5BlockingClient createClient(MqttClientProperties clientProperties, ComponentLog logger) throws TlsException {
+    private Mqtt5BlockingClient createClient(MqttClientProperties clientProperties, ComponentLog logger) throws TlsException {
         logger.debug("Creating Mqtt v5 client");
 
-        Mqtt5ClientBuilder mqtt5ClientBuilder = Mqtt5Client.builder()
-                .identifier(clientProperties.getClientId())
-                .serverHost(clientProperties.getBrokerUri().getHost());
+        final URI initialBroker = brokers.next();
 
-        int port = clientProperties.getBrokerUri().getPort();
+        final Mqtt5ClientBuilder mqtt5ClientBuilder = Mqtt5Client.builder()
+                .identifier(clientProperties.getClientId())
+                .serverHost(initialBroker.getHost())
+                .automaticReconnect().applyAutomaticReconnect()
+                .addDisconnectedListener(context -> {
+                    final URI failOverBroker = brokers.next();
+                    logger.debug("Reconnecting to {}", failOverBroker.getHost());
+                    context.getReconnector()
+                            .transportConfig()
+                                .serverHost(failOverBroker.getHost())
+                                .serverPort(failOverBroker.getPort())
+                            .applyTransportConfig();
+                });
+
+        final int port = initialBroker.getPort();
         if (port != -1) {
             mqtt5ClientBuilder.serverPort(port);
         }

@@ -161,6 +161,7 @@ public class PublishMQTT extends AbstractMQTTProcessor implements MqttCallback {
     @OnScheduled
     public void onScheduled(final ProcessContext context) {
         super.onScheduled(context);
+        initializeClient(context);
     }
 
     @OnStopped
@@ -177,13 +178,13 @@ public class PublishMQTT extends AbstractMQTTProcessor implements MqttCallback {
             return;
         }
 
-        if (!isConnected()) {
-            synchronized (this) {
-                if (!isConnected()) {
-                    initializeClient(context);
-                }
-            }
-        }
+//        if (!isConnected()) {
+//            synchronized (this) {
+//                if (!isConnected()) {
+//
+//                }
+//            }
+//        }
 
         // get the MQTT topic
         final String topic = context.getProperty(PROP_TOPIC).evaluateAttributeExpressions(flowfile).getValue();
@@ -253,7 +254,7 @@ public class PublishMQTT extends AbstractMQTTProcessor implements MqttCallback {
                 provenanceEventDetails = String.format(PROVENANCE_EVENT_DETAILS_ON_RECORDSET_SUCCESS, processedRecords.get());
             }
 
-            session.getProvenanceReporter().send(flowfile, clientProperties.getBroker(), provenanceEventDetails, stopWatch.getElapsed(TimeUnit.MILLISECONDS));
+            session.getProvenanceReporter().send(flowfile, clientProperties.getBrokerUris().get(0).toString(), provenanceEventDetails, stopWatch.getElapsed(TimeUnit.MILLISECONDS));
             session.transfer(successFlowFile, REL_SUCCESS);
         } catch (Exception e) {
             logger.error("An error happened during publishing records. Routing to failure.", e);
@@ -263,7 +264,7 @@ public class PublishMQTT extends AbstractMQTTProcessor implements MqttCallback {
             if (processedRecords.get() > 0) {
                 session.getProvenanceReporter().send(
                         failedFlowFile,
-                        clientProperties.getBroker(),
+                        clientProperties.getBrokerUris().get(0).toString(),
                         String.format(PROVENANCE_EVENT_DETAILS_ON_RECORDSET_FAILURE, processedRecords.get()),
                         stopWatch.getElapsed(TimeUnit.MILLISECONDS));
             }
@@ -279,7 +280,7 @@ public class PublishMQTT extends AbstractMQTTProcessor implements MqttCallback {
 
             final StopWatch stopWatch = new StopWatch(true);
             publishMessage(context, flowfile, topic, messageContent);
-            session.getProvenanceReporter().send(flowfile, clientProperties.getBroker(), stopWatch.getElapsed(TimeUnit.MILLISECONDS));
+            session.getProvenanceReporter().send(flowfile, clientProperties.getBrokerUris().get(0).toString(), stopWatch.getElapsed(TimeUnit.MILLISECONDS));
             session.transfer(flowfile, REL_SUCCESS);
         } catch (Exception e) {
             logger.error("An error happened during publishing a message. Routing to failure.", e);
@@ -308,14 +309,14 @@ public class PublishMQTT extends AbstractMQTTProcessor implements MqttCallback {
                 mqttClient.connect();
             }
         } catch (Exception e) {
-            logger.error("Connection to {} lost (or was never connected) and connection failed. Yielding processor", clientProperties.getBroker(), e);
+            logger.error("Connection to {} lost (or was never connected) and connection failed. Yielding processor", clientProperties.getBrokerUris().get(0).toString(), e);
             context.yield();
         }
     }
 
     @Override
     public void connectionLost(Throwable cause) {
-        logger.error("Connection to {} lost", clientProperties.getBroker(), cause);
+        logger.error("Connection to {} lost", clientProperties.getBrokerUris().get(0).toString(), cause);
     }
 
     @Override
