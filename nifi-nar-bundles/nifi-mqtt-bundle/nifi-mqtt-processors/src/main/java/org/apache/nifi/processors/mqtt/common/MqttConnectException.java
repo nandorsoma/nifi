@@ -16,32 +16,13 @@
  */
 package org.apache.nifi.processors.mqtt.common;
 
-import java.util.ArrayList;
-import java.util.List;
+public class MqttConnectException extends MqttException {
 
-public class RoundRobinList<T> {
-
-    private final List<T> list;
-    private int index = 0;
-
-    public RoundRobinList(List<T> list) {
-        this.list = new ArrayList<>(list);
+    public MqttConnectException(String message) {
+        super(message);
     }
 
-    public synchronized T next() {
-        if (index < list.size()) {
-            return list.get(index++);
-        } else {
-            index = 0;
-            return list.get(index);
-        }
-    }
-
-    private synchronized T getCurrentElement() {
-        return list.get(index);
-    }
-
-    public synchronized void reset() {
-        index = 0;
+    public MqttConnectException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

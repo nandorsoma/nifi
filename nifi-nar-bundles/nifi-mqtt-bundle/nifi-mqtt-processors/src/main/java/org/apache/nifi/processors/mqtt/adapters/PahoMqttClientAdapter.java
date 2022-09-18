@@ -20,6 +20,7 @@ import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processors.mqtt.common.MqttCallback;
 import org.apache.nifi.processors.mqtt.common.MqttClient;
 import org.apache.nifi.processors.mqtt.common.MqttClientProperties;
+import org.apache.nifi.processors.mqtt.common.MqttConnectException;
 import org.apache.nifi.processors.mqtt.common.MqttException;
 import org.apache.nifi.processors.mqtt.common.ReceivedMqttMessage;
 import org.apache.nifi.processors.mqtt.common.StandardMqttMessage;
@@ -124,6 +125,10 @@ public class PahoMqttClientAdapter implements MqttClient {
         try {
             client.publish(topic, message.getPayload(), message.getQos(), message.isRetained());
         } catch (org.eclipse.paho.client.mqttv3.MqttException e) {
+            if ("Client is not connected".equals(e.getMessage())) {
+                logger.debug("Client is not connected. Reason code: {}", e.getReasonCode());
+                throw new MqttConnectException("Client is not connected.", e);
+            }
             throw new MqttException("An error has occurred during publishing message to " + topic + " with QoS: " + message.getQos(), e);
         }
     }

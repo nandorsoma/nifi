@@ -325,7 +325,8 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
 
         scheduled.set(true);
 
-        initializeClient(context);
+        initializeClient();
+        mqttClient.subscribe(topicPrefix + topicFilter, qos);
     }
 
     @OnUnscheduled
@@ -360,14 +361,11 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
 
     @Override
     public void onTrigger(final ProcessContext context, final ProcessSession session) throws ProcessException {
-        final boolean isScheduled = scheduled.get();
-//        if (!isConnected() && isScheduled) {
-//            synchronized (this) {
-//                if (!isConnected()) {
-//                    initializeClient(context);
-//                }
-//            }
-//        }
+        if (!isConnected()) {
+            logger.error("Client is not connected.");
+            context.yield();
+            return;
+        }
 
         if (mqttQueue.isEmpty()) {
             context.yield();
@@ -383,25 +381,11 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
         }
     }
 
-    private void initializeClient(ProcessContext context) {
-        // NOTE: This method is called when isConnected returns false which can happen when the client is null, or when it is
-        // non-null but not connected, so we need to handle each case and only create a new client when it is null
-        try {
-            if (mqttClient == null) {
-                mqttClient = createMqttClient();
-                mqttClient.setCallback(this);
-            }
-
-            if (!mqttClient.isConnected()) {
-                mqttClient.connect();
-                mqttClient.subscribe(topicPrefix + topicFilter, qos);
-            }
-        } catch (Exception e) {
-            //TODO: mi van ha tobb brokerhez akarunk kapcsolodni? 1 megy, masik nem?
-            logger.error("Connection to {} lost (or was never connected) and connection failed. Yielding processor", new Object[]{clientProperties.getBrokerUris().get(0).toString()}, e);
-            mqttClient = null; // prevent stucked processor when subscribe fails
-            context.yield();
-        }
+    private void initializeClient() {
+        mqttClient = createMqttClient();
+        mqttClient.setCallback(this);
+        mqttClient.connect();
+        logger.info("Successfully initialized and connected client.");
     }
 
     private void transferQueue(ProcessSession session) {
@@ -421,7 +405,7 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
     private void transferQueueDemarcator(final ProcessContext context, final ProcessSession session) {
         final byte[] demarcator = context.getProperty(MESSAGE_DEMARCATOR).evaluateAttributeExpressions().getValue().getBytes(StandardCharsets.UTF_8);
 
-        //TODO: mert itt nem tudjatjuk melyik brokerrol jott az uzenet
+        //TODO: probably it is not possible to specify the exact broker here
         FlowFile messageFlowfile = session.create();
         session.putAttribute(messageFlowfile, BROKER_ATTRIBUTE_KEY, clientProperties.getBrokerUris().get(0).toString());
 
@@ -454,7 +438,7 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
         FlowFile messageFlowfile = session.create();
 
         final Map<String, String> attrs = new HashMap<>();
-        //TODO: szinten jo lenne tudni honnan jott az uzenet
+        //TODO: probably it is not possible to specify the exact broker here
         attrs.put(BROKER_ATTRIBUTE_KEY, clientProperties.getBrokerUris().get(0).toString());
         attrs.put(TOPIC_ATTRIBUTE_KEY, mqttMessage.getTopic());
         attrs.put(QOS_ATTRIBUTE_KEY, String.valueOf(mqttMessage.getQos()));
@@ -470,7 +454,7 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
         final RecordSetWriterFactory writerFactory = context.getProperty(RECORD_WRITER).asControllerService(RecordSetWriterFactory.class);
 
         final FlowFile flowFile = session.create();
-        //TODO: szinten nem tudjuk honnan jott
+        //TODO: probably it is not possible to specify the exact broker here
         session.putAttribute(flowFile, BROKER_ATTRIBUTE_KEY, clientProperties.getBrokerUris().get(0).toString());
 
         final Map<String, String> attributes = new HashMap<>();
@@ -589,7 +573,7 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
                 logger.error("Could not add {} message(s) back into the internal queue, this could mean data loss", numberOfMessages);
             }
 
-            //TODO: szinten
+            //TODO: probably it is not possible to specify the exact broker here
             throw new ProcessException("Could not process data received from the MQTT broker(s): " + clientProperties.getBrokerUris().get(0).toString(), e);
         } finally {
             closeWriter(writer);
@@ -620,7 +604,7 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
     }
 
     private String getTransitUri(String... appends) {
-        //TODO: szinten, nem jo h nem tudjuk honnan jott
+        //TODO: probably it is not possible to specify the exact broker here
         String broker = clientProperties.getBrokerUris().get(0).toString();
         StringBuilder stringBuilder = new StringBuilder(broker.endsWith("/") ? broker : broker + "/");
         for (String append : appends) {
@@ -631,7 +615,7 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
 
     @Override
     public void connectionLost(Throwable cause) {
-        //TODO: mihez lost?
+        //TODO: probably it is not possible to specify the exact broker here
         logger.error("Connection to {} lost", clientProperties.getBrokerUris().get(0).toString(), cause);
     }
 

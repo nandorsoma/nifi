@@ -39,6 +39,7 @@ import org.apache.nifi.processor.exception.ProcessException;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.processors.mqtt.common.AbstractMQTTProcessor;
 import org.apache.nifi.processors.mqtt.common.MqttCallback;
+import org.apache.nifi.processors.mqtt.common.MqttConnectException;
 import org.apache.nifi.processors.mqtt.common.ReceivedMqttMessage;
 import org.apache.nifi.processors.mqtt.common.StandardMqttMessage;
 import org.apache.nifi.schema.access.SchemaNotFoundException;
@@ -161,7 +162,7 @@ public class PublishMQTT extends AbstractMQTTProcessor implements MqttCallback {
     @OnScheduled
     public void onScheduled(final ProcessContext context) {
         super.onScheduled(context);
-        initializeClient(context);
+        initializeClient();
     }
 
     @OnStopped
@@ -178,13 +179,10 @@ public class PublishMQTT extends AbstractMQTTProcessor implements MqttCallback {
             return;
         }
 
-//        if (!isConnected()) {
-//            synchronized (this) {
-//                if (!isConnected()) {
-//
-//                }
-//            }
-//        }
+        if (!isConnected()) {
+            context.yield();
+            return;
+        }
 
         // get the MQTT topic
         final String topic = context.getProperty(PROP_TOPIC).evaluateAttributeExpressions(flowfile).getValue();
@@ -256,6 +254,10 @@ public class PublishMQTT extends AbstractMQTTProcessor implements MqttCallback {
 
             session.getProvenanceReporter().send(flowfile, clientProperties.getBrokerUris().get(0).toString(), provenanceEventDetails, stopWatch.getElapsed(TimeUnit.MILLISECONDS));
             session.transfer(successFlowFile, REL_SUCCESS);
+        } catch (MqttConnectException e) {
+            logger.error("Connection error happened during publishing records. Yielding processor.", e);
+            //TODO: maybe it is enough to check isConnected then yield in the onTrigger() method
+            context.yield();
         } catch (Exception e) {
             logger.error("An error happened during publishing records. Routing to failure.", e);
 
@@ -282,6 +284,10 @@ public class PublishMQTT extends AbstractMQTTProcessor implements MqttCallback {
             publishMessage(context, flowfile, topic, messageContent);
             session.getProvenanceReporter().send(flowfile, clientProperties.getBrokerUris().get(0).toString(), stopWatch.getElapsed(TimeUnit.MILLISECONDS));
             session.transfer(flowfile, REL_SUCCESS);
+        } catch (MqttConnectException e) {
+            logger.error("Connection error happened during publishing records. Yielding processor.", e);
+            //TODO: maybe it is enough to check isConnected then yield in the onTrigger() method
+            context.yield();
         } catch (Exception e) {
             logger.error("An error happened during publishing a message. Routing to failure.", e);
             session.transfer(flowfile, REL_FAILURE);
@@ -296,22 +302,11 @@ public class PublishMQTT extends AbstractMQTTProcessor implements MqttCallback {
         mqttClient.publish(topic, mqttMessage);
     }
 
-    private void initializeClient(ProcessContext context) {
-        // NOTE: This method is called when isConnected returns false which can happen when the client is null, or when it is
-        // non-null but not connected, so we need to handle each case and only create a new client when it is null
-        try {
-            if (mqttClient == null) {
-                mqttClient = createMqttClient();
-                mqttClient.setCallback(this);
-            }
-
-            if (!mqttClient.isConnected()) {
-                mqttClient.connect();
-            }
-        } catch (Exception e) {
-            logger.error("Connection to {} lost (or was never connected) and connection failed. Yielding processor", clientProperties.getBrokerUris().get(0).toString(), e);
-            context.yield();
-        }
+    private void initializeClient() {
+        mqttClient = createMqttClient();
+        mqttClient.setCallback(this);
+        mqttClient.connect();
+        logger.info("Successfully initialized and connected client.");
     }
 
     @Override

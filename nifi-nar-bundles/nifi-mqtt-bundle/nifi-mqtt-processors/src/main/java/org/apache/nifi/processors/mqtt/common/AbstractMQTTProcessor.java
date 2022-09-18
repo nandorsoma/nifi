@@ -125,7 +125,7 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
 
     public static final PropertyDescriptor PROP_BROKER_URI = new PropertyDescriptor.Builder()
             .name("Broker URI")
-            .displayName("Broker URI 2")
+            .displayName("Broker URI 3")
             .description("The URI to use to connect to the MQTT broker (e.g. tcp://localhost:1883). The 'tcp', 'ssl', 'ws' and 'wss' schemes are supported. In order to use 'ssl', the SSL Context " +
                     "Service property must be set.")
             .required(true)
@@ -343,8 +343,12 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
         }
     }
 
-    protected MqttClient createMqttClient() throws TlsException {
-        return mqttClientFactory.create(clientProperties, getLogger());
+    protected MqttClient createMqttClient() {
+        try {
+            return mqttClientFactory.create(clientProperties, getLogger());
+        } catch (TlsException e) {
+            throw new MqttException("An error happened during creating client.", e);
+        }
     }
 
 

@@ -110,6 +110,7 @@ public class HiveMqV5ClientAdapter implements MqttClient {
 
     @Override
     public void close() {
+        brokers.reset();
         // there is no paho's close equivalent in hivemq client
     }
 
@@ -167,7 +168,7 @@ public class HiveMqV5ClientAdapter implements MqttClient {
         final Mqtt5ClientBuilder mqtt5ClientBuilder = Mqtt5Client.builder()
                 .identifier(clientProperties.getClientId())
                 .serverHost(initialBroker.getHost())
-                .automaticReconnect().applyAutomaticReconnect()
+                .automaticReconnectWithDefaultConfig()
                 .addDisconnectedListener(context -> {
                     final URI failOverBroker = brokers.next();
                     logger.debug("Reconnecting to {}", failOverBroker.getHost());
