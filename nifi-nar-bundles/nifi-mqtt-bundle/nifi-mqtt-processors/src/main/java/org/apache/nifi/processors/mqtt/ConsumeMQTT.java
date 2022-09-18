@@ -396,17 +396,12 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
         // NOTE: This method is called when isConnected returns false which can happen when the client is null, or when it is
         // non-null but not connected, so we need to handle each case and only create a new client when it is null
         try {
-            if (mqttClient == null) {
-                mqttClient = createMqttClient();
-                mqttClient.setCallback(this);
-            }
-
-            if (!mqttClient.isConnected()) {
-                mqttClient.connect();
-                mqttClient.subscribe(topicPrefix + topicFilter, qos);
-            }
+            mqttClient = createMqttClient();
+            mqttClient.setCallback(this);
+            mqttClient.connect();
+            mqttClient.subscribe(topicPrefix + topicFilter, qos);
         } catch (Exception e) {
-            logger.error("Connection to {} lost (or was never connected) and connection failed. Yielding processor", new Object[]{clientProperties.getBroker()}, e);
+            logger.error("Connection to {} lost (or was never connected) and connection failed. Yielding processor", new Object[]{brokerUris.getCurrentElement().toString()}, e);
             mqttClient = null; // prevent stucked processor when subscribe fails
             context.yield();
         }
@@ -429,8 +424,9 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
     private void transferQueueDemarcator(final ProcessContext context, final ProcessSession session) {
         final byte[] demarcator = context.getProperty(MESSAGE_DEMARCATOR).evaluateAttributeExpressions().getValue().getBytes(StandardCharsets.UTF_8);
 
+        //TODO: it can happen that the current element is already the next element, because client switched brokers
         FlowFile messageFlowfile = session.create();
-        session.putAttribute(messageFlowfile, BROKER_ATTRIBUTE_KEY, clientProperties.getBroker());
+        session.putAttribute(messageFlowfile, BROKER_ATTRIBUTE_KEY, brokerUris.getCurrentElement().toString());
 
         messageFlowfile = session.append(messageFlowfile, out -> {
             int i = 0;
@@ -461,7 +457,8 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
         FlowFile messageFlowfile = session.create();
 
         final Map<String, String> attrs = new HashMap<>();
-        attrs.put(BROKER_ATTRIBUTE_KEY, clientProperties.getBroker());
+        //TODO: it can happen that the current element is already the next element, because client switched brokers
+        attrs.put(BROKER_ATTRIBUTE_KEY, brokerUris.getCurrentElement().toString());
         attrs.put(TOPIC_ATTRIBUTE_KEY, mqttMessage.getTopic());
         attrs.put(QOS_ATTRIBUTE_KEY, String.valueOf(mqttMessage.getQos()));
         attrs.put(IS_DUPLICATE_ATTRIBUTE_KEY, String.valueOf(mqttMessage.isDuplicate()));
@@ -476,7 +473,8 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
         final RecordSetWriterFactory writerFactory = context.getProperty(RECORD_WRITER).asControllerService(RecordSetWriterFactory.class);
 
         final FlowFile flowFile = session.create();
-        session.putAttribute(flowFile, BROKER_ATTRIBUTE_KEY, clientProperties.getBroker());
+        //TODO: it can happen that the current element is already the next element, because client switched brokers
+        session.putAttribute(flowFile, BROKER_ATTRIBUTE_KEY,brokerUris.getCurrentElement().toString());
 
         final Map<String, String> attributes = new HashMap<>();
         final AtomicInteger recordCount = new AtomicInteger();
@@ -594,7 +592,8 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
                 logger.error("Could not add {} message(s) back into the internal queue, this could mean data loss", numberOfMessages);
             }
 
-            throw new ProcessException("Could not process data received from the MQTT broker(s): " + clientProperties.getBroker(), e);
+            //TODO: it can happen that the current element is already the next element, because client switched brokers
+            throw new ProcessException("Could not process data received from the MQTT broker(s): " + brokerUris.getCurrentElement().toString(), e);
         } finally {
             closeWriter(writer);
         }
@@ -624,7 +623,8 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
     }
 
     private String getTransitUri(String... appends) {
-        String broker = clientProperties.getBrokerUri().toString();
+        //TODO: it can happen that the current element is already the next element, because client switched brokers
+        String broker = brokerUris.getCurrentElement().toString();
         StringBuilder stringBuilder = new StringBuilder(broker.endsWith("/") ? broker : broker + "/");
         for (String append : appends) {
             stringBuilder.append(append);
@@ -634,7 +634,8 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
 
     @Override
     public void connectionLost(Throwable cause) {
-        logger.error("Connection to {} lost", clientProperties.getBroker(), cause);
+        //TODO: when connection lost it can happen that the current element is already the next element
+        logger.error("Connection to {} lost", brokerUris.getCurrentElement().toString(), cause);
     }
 
     @Override

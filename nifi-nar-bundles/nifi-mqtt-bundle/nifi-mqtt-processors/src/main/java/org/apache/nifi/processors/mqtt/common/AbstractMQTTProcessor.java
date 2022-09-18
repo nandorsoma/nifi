@@ -44,6 +44,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.EnumUtils.isValidEnumIgnoreCase;
@@ -64,6 +65,7 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
 
     protected ComponentLog logger;
 
+    protected RoundRobinList<URI> brokerUris;
     protected MqttClientProperties clientProperties;
 
     protected MqttClientFactory mqttClientFactory = new MqttClientFactory();
@@ -128,7 +130,8 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
                     "Service property must be set.")
             .required(true)
             .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
-            .addValidator(BROKER_VALIDATOR)
+            .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
+//            .addValidator(BROKER_VALIDATOR)
             .build();
 
     public static final PropertyDescriptor PROP_CLIENTID = new PropertyDescriptor.Builder()
@@ -285,6 +288,7 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
     }
 
     protected void onScheduled(final ProcessContext context) {
+        brokerUris = getBrokerUris(context);
         clientProperties = getMqttClientProperties(context);
     }
 
@@ -311,7 +315,7 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
     }
 
     protected MqttClient createMqttClient() throws TlsException {
-        return mqttClientFactory.create(clientProperties, getLogger());
+        return mqttClientFactory.create(brokerUris.next(), clientProperties, getLogger());
     }
 
 
@@ -337,14 +341,16 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
         return (mqttClient != null && mqttClient.isConnected());
     }
 
+    protected RoundRobinList<URI> getBrokerUris(final ProcessContext context) {
+        final String brokerUris = context.getProperty(PROP_BROKER_URI).evaluateAttributeExpressions().getValue();
+        final List<URI> uris = Pattern.compile(",").splitAsStream(brokerUris)
+                .map(this::parseUri)
+                .collect(Collectors.toList());
+        return new RoundRobinList<>(uris);
+    }
+
     protected MqttClientProperties getMqttClientProperties(final ProcessContext context) {
         final MqttClientProperties clientProperties = new MqttClientProperties();
-
-        try {
-            clientProperties.setBrokerUri(new URI(context.getProperty(PROP_BROKER_URI).evaluateAttributeExpressions().getValue()));
-        } catch (URISyntaxException e) {
-            throw new IllegalArgumentException("Invalid Broker URI", e);
-        }
 
         String clientId = context.getProperty(PROP_CLIENTID).evaluateAttributeExpressions().getValue();
         if (clientId == null) {
@@ -380,5 +386,13 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
         clientProperties.setPassword(context.getProperty(PROP_PASSWORD).getValue());
 
         return clientProperties;
+    }
+
+    private URI parseUri(String uri) {
+        try {
+            return new URI(uri);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Invalid Broker URI", e);
+        }
     }
 }

@@ -21,15 +21,17 @@ import org.apache.nifi.processors.mqtt.adapters.HiveMqV5ClientAdapter;
 import org.apache.nifi.processors.mqtt.adapters.PahoMqttClientAdapter;
 import org.apache.nifi.security.util.TlsException;
 
+import java.net.URI;
+
 public class MqttClientFactory {
-    public MqttClient create(MqttClientProperties clientProperties, ComponentLog logger) throws TlsException {
+    public MqttClient create(URI brokerUri, MqttClientProperties clientProperties, ComponentLog logger) throws TlsException {
         switch (clientProperties.getMqttVersion()) {
             case MQTT_VERSION_3_AUTO:
             case MQTT_VERSION_3_1:
             case MQTT_VERSION_3_1_1:
-                return new PahoMqttClientAdapter(clientProperties, logger);
+                return new PahoMqttClientAdapter(brokerUri, clientProperties, logger);
             case MQTT_VERSION_5_0:
-                return new HiveMqV5ClientAdapter(clientProperties, logger);
+                return new HiveMqV5ClientAdapter(brokerUri, clientProperties, logger);
             default:
                 throw new MqttException("Unsupported Mqtt version: " + clientProperties.getMqttVersion());
         }
