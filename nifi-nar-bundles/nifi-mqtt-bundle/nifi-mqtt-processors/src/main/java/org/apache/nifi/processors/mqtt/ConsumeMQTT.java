@@ -350,7 +350,7 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
     public void onStopped(final ProcessContext context) {
         if (mqttQueue != null && !mqttQueue.isEmpty() && processSessionFactory != null) {
             logger.info("Finishing processing leftover messages");
-            ProcessSession session = processSessionFactory.createSession();
+            final ProcessSession session = processSessionFactory.createSession();
             if (context.getProperty(RECORD_READER).isSet()) {
                 transferQueueRecord(context, session);
             } else if (context.getProperty(MESSAGE_DEMARCATOR).isSet()) {
@@ -401,7 +401,7 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
             mqttClient.connect();
             mqttClient.subscribe(topicPrefix + topicFilter, qos);
         } catch (Exception e) {
-            logger.error("Connection to {} lost (or was never connected) and connection failed. Yielding processor", new Object[]{brokerUris.getCurrentElement().toString()}, e);
+            logger.error("Connection failed to {}. Yielding processor", clientProperties.getRawBrokerUris(), e);
             mqttClient = null; // prevent stucked processor when subscribe fails
             context.yield();
         }
@@ -424,9 +424,8 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
     private void transferQueueDemarcator(final ProcessContext context, final ProcessSession session) {
         final byte[] demarcator = context.getProperty(MESSAGE_DEMARCATOR).evaluateAttributeExpressions().getValue().getBytes(StandardCharsets.UTF_8);
 
-        //TODO: it can happen that the current element is already the next element, because client switched brokers
         FlowFile messageFlowfile = session.create();
-        session.putAttribute(messageFlowfile, BROKER_ATTRIBUTE_KEY, brokerUris.getCurrentElement().toString());
+        session.putAttribute(messageFlowfile, BROKER_ATTRIBUTE_KEY, clientProperties.getRawBrokerUris());
 
         messageFlowfile = session.append(messageFlowfile, out -> {
             int i = 0;
@@ -457,8 +456,7 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
         FlowFile messageFlowfile = session.create();
 
         final Map<String, String> attrs = new HashMap<>();
-        //TODO: it can happen that the current element is already the next element, because client switched brokers
-        attrs.put(BROKER_ATTRIBUTE_KEY, brokerUris.getCurrentElement().toString());
+        attrs.put(BROKER_ATTRIBUTE_KEY, clientProperties.getRawBrokerUris());
         attrs.put(TOPIC_ATTRIBUTE_KEY, mqttMessage.getTopic());
         attrs.put(QOS_ATTRIBUTE_KEY, String.valueOf(mqttMessage.getQos()));
         attrs.put(IS_DUPLICATE_ATTRIBUTE_KEY, String.valueOf(mqttMessage.isDuplicate()));
@@ -473,8 +471,7 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
         final RecordSetWriterFactory writerFactory = context.getProperty(RECORD_WRITER).asControllerService(RecordSetWriterFactory.class);
 
         final FlowFile flowFile = session.create();
-        //TODO: it can happen that the current element is already the next element, because client switched brokers
-        session.putAttribute(flowFile, BROKER_ATTRIBUTE_KEY,brokerUris.getCurrentElement().toString());
+        session.putAttribute(flowFile, BROKER_ATTRIBUTE_KEY, clientProperties.getRawBrokerUris());
 
         final Map<String, String> attributes = new HashMap<>();
         final AtomicInteger recordCount = new AtomicInteger();
@@ -592,8 +589,7 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
                 logger.error("Could not add {} message(s) back into the internal queue, this could mean data loss", numberOfMessages);
             }
 
-            //TODO: it can happen that the current element is already the next element, because client switched brokers
-            throw new ProcessException("Could not process data received from the MQTT broker(s): " + brokerUris.getCurrentElement().toString(), e);
+            throw new ProcessException("Could not process data received from the MQTT broker(s): " + clientProperties.getRawBrokerUris(), e);
         } finally {
             closeWriter(writer);
         }
@@ -609,7 +605,7 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
 
         final int count = recordCount.get();
         session.adjustCounter(COUNTER_RECORDS_PROCESSED, count, false);
-        getLogger().info("Successfully processed {} records for {}", count, flowFile);
+        logger.info("Successfully processed {} records for {}", count, flowFile);
     }
 
     private void closeWriter(final RecordSetWriter writer) {
@@ -623,9 +619,8 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
     }
 
     private String getTransitUri(String... appends) {
-        //TODO: it can happen that the current element is already the next element, because client switched brokers
-        String broker = brokerUris.getCurrentElement().toString();
-        StringBuilder stringBuilder = new StringBuilder(broker.endsWith("/") ? broker : broker + "/");
+        final String broker = clientProperties.getRawBrokerUris();
+        final StringBuilder stringBuilder = new StringBuilder(broker.endsWith("/") ? broker : broker + "/");
         for (String append : appends) {
             stringBuilder.append(append);
         }
@@ -634,15 +629,14 @@ public class ConsumeMQTT extends AbstractMQTTProcessor implements MqttCallback {
 
     @Override
     public void connectionLost(Throwable cause) {
-        //TODO: when connection lost it can happen that the current element is already the next element
-        logger.error("Connection to {} lost", brokerUris.getCurrentElement().toString(), cause);
+        logger.error("Connection to {} lost", clientProperties.getRawBrokerUris(), cause);
     }
 
     @Override
     public void messageArrived(ReceivedMqttMessage message) {
         if (logger.isDebugEnabled()) {
             byte[] payload = message.getPayload();
-            String text = new String(payload, StandardCharsets.UTF_8);
+            final String text = new String(payload, StandardCharsets.UTF_8);
             if (StringUtils.isAsciiPrintable(text)) {
                 logger.debug("Message arrived from topic {}. Payload: {}", message.getTopic(), text);
             } else {

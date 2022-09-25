@@ -145,7 +145,7 @@ public class HiveMqV5ClientAdapter implements MqttClient {
         // Setting "listener" callback is only possible with async client, though sending subscribe message
         // should happen in a blocking way to make sure the processor is blocked until ack is not arrived.
         try {
-            Mqtt5SubAck ack = futureAck.get(clientProperties.getConnectionTimeout(), TimeUnit.SECONDS);
+            final Mqtt5SubAck ack = futureAck.get(clientProperties.getConnectionTimeout(), TimeUnit.SECONDS);
             logger.debug("Received mqtt5 subscribe ack: {}", ack);
         } catch (Exception e) {
             throw new MqttException("An error has occurred during sending subscribe message to broker", e);
@@ -169,7 +169,7 @@ public class HiveMqV5ClientAdapter implements MqttClient {
             mqtt5ClientBuilder.serverPort(port);
         }
 
-        MqttProtocolScheme scheme = MqttProtocolScheme.valueOf(brokerUri.getScheme());
+        final MqttProtocolScheme scheme = MqttProtocolScheme.valueOf(brokerUri.getScheme());
         // default is tcp
         if (WS.equals(scheme) || WSS.equals(scheme)) {
             mqtt5ClientBuilder.webSocketConfig().applyWebSocketConfig();

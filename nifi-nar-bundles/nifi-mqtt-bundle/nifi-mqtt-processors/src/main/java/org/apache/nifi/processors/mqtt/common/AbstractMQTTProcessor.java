@@ -65,10 +65,9 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
 
     protected ComponentLog logger;
 
-    protected RoundRobinList<URI> brokerUris;
     protected MqttClientProperties clientProperties;
 
-    protected MqttClientFactory mqttClientFactory = new MqttClientFactory();
+    protected MqttClientFactory mqttClientFactory;
     protected MqttClient mqttClient;
 
     public ProcessSessionFactory processSessionFactory;
@@ -311,8 +310,8 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
     }
 
     protected void onScheduled(final ProcessContext context) {
-        brokerUris = getBrokerUris(context);
         clientProperties = getMqttClientProperties(context);
+        mqttClientFactory = new MqttClientFactory(clientProperties, logger);
     }
 
     protected void stopClient() {
@@ -338,7 +337,7 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
     }
 
     protected MqttClient createMqttClient() throws TlsException {
-        return mqttClientFactory.create(brokerUris.next(), clientProperties, getLogger());
+        return mqttClientFactory.create();
     }
 
 
@@ -364,14 +363,12 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
         return (mqttClient != null && mqttClient.isConnected());
     }
 
-    protected RoundRobinList<URI> getBrokerUris(final ProcessContext context) {
-        final String brokerUris = context.getProperty(PROP_BROKER_URI).evaluateAttributeExpressions().getValue();
-        final List<URI> uris = parseBrokerUris(brokerUris);
-        return new RoundRobinList<>(uris);
-    }
-
     protected MqttClientProperties getMqttClientProperties(final ProcessContext context) {
         final MqttClientProperties clientProperties = new MqttClientProperties();
+
+        final String rawBrokerUris = context.getProperty(PROP_BROKER_URI).evaluateAttributeExpressions().getValue();
+        clientProperties.setRawBrokerUris(rawBrokerUris);
+        clientProperties.setBrokerUris(parseBrokerUris(rawBrokerUris));
 
         String clientId = context.getProperty(PROP_CLIENTID).evaluateAttributeExpressions().getValue();
         if (clientId == null) {

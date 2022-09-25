@@ -18,7 +18,13 @@ package org.apache.nifi.processors.mqtt.common;
 
 import org.apache.nifi.security.util.TlsConfiguration;
 
+import java.net.URI;
+import java.util.List;
+
 public class MqttClientProperties {
+    private String rawBrokerUris;
+    private List<URI> brokerUris;
+
     private String clientId;
 
     private MqttVersion mqttVersion;
@@ -38,6 +44,22 @@ public class MqttClientProperties {
 
     private String username;
     private String password;
+
+    public String getRawBrokerUris() {
+        return rawBrokerUris;
+    }
+
+    public void setRawBrokerUris(String rawBrokerUris) {
+        this.rawBrokerUris = rawBrokerUris;
+    }
+
+    public List<URI> getBrokerUris() {
+        return brokerUris;
+    }
+
+    public void setBrokerUris(List<URI> brokerUris) {
+        this.brokerUris = brokerUris;
+    }
 
     public String getClientId() {
         return clientId;
