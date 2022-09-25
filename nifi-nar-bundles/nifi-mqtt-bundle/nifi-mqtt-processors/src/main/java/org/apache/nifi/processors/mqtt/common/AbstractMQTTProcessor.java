@@ -83,15 +83,21 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
 
     public static final Validator BROKER_VALIDATOR = (subject, input, context) -> {
         try {
-            URI brokerURI = new URI(input);
-            if (!EMPTY.equals(brokerURI.getPath())) {
-                return new ValidationResult.Builder().subject(subject).valid(false).explanation("the broker URI cannot have a path. It currently is: " + brokerURI.getPath()).build();
+            final List<URI> brokerUris = parseBrokerUris(input);
+            for(URI brokerUri : brokerUris) {
+                if (!EMPTY.equals(brokerUri.getPath())) {
+                    return new ValidationResult.Builder().subject(subject).valid(false).explanation("the broker URI cannot have a path. It currently is: " + brokerUri.getPath()).build();
+                }
+                final String scheme = brokerUri.getScheme();
+                if (!isValidEnumIgnoreCase(MqttProtocolScheme.class, scheme)) {
+                    return new ValidationResult.Builder().subject(subject).valid(false)
+                            .explanation("scheme is invalid. Supported schemes are: " + getSupportedSchemeList()).build();
+                }
+                if (!scheme.equals(brokerUris.get(0).getScheme())) {
+                    return new ValidationResult.Builder().subject(subject).valid(false).explanation("all URIs should use the same scheme.").build();
+                }
             }
-            if (!isValidEnumIgnoreCase(MqttProtocolScheme.class, brokerURI.getScheme())) {
-                return new ValidationResult.Builder().subject(subject).valid(false)
-                        .explanation("scheme is invalid. Supported schemes are: " + getSupportedSchemeList()).build();
-            }
-        } catch (URISyntaxException e) {
+        } catch (Exception e) {
             return new ValidationResult.Builder().subject(subject).valid(false).explanation("it is not valid URI syntax.").build();
         }
         return new ValidationResult.Builder().subject(subject).valid(true).build();
@@ -126,12 +132,14 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
 
     public static final PropertyDescriptor PROP_BROKER_URI = new PropertyDescriptor.Builder()
             .name("Broker URI")
-            .description("The URI to use to connect to the MQTT broker (e.g. tcp://localhost:1883). The 'tcp', 'ssl', 'ws' and 'wss' schemes are supported. In order to use 'ssl', the SSL Context " +
-                    "Service property must be set.")
+            .description("Broker URI(s)")
+            .description("The URI(s) to use to connect to the MQTT broker (e.g., tcp://localhost:1883). The 'tcp', 'ssl', 'ws' and 'wss' schemes are supported. " +
+                    "In order to use 'ssl', the SSL Context Service property must be set. When a comma-separated URI list is set (e.g., tcp://localhost:1883,tcp://localhost:1884), " +
+                    "the processor will use a round-robin algorithm to connect to the brokers on connection failure.")
             .required(true)
             .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
             .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
-//            .addValidator(BROKER_VALIDATOR)
+            .addValidator(BROKER_VALIDATOR)
             .build();
 
     public static final PropertyDescriptor PROP_CLIENTID = new PropertyDescriptor.Builder()
@@ -268,13 +276,28 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
         }
 
         try {
-            URI brokerURI = new URI(validationContext.getProperty(PROP_BROKER_URI).evaluateAttributeExpressions().getValue());
-            if (brokerURI.getScheme().equalsIgnoreCase("ssl") && !validationContext.getProperty(PROP_SSL_CONTEXT_SERVICE).isSet()) {
-                results.add(new ValidationResult.Builder().subject(PROP_SSL_CONTEXT_SERVICE.getName() + " or " + PROP_BROKER_URI.getName()).valid(false).explanation("if the 'ssl' scheme is used in " +
-                        "the broker URI, the SSL Context Service must be set.").build());
+            final List<URI> brokerUris = parseBrokerUris(validationContext.getProperty(PROP_BROKER_URI).evaluateAttributeExpressions().getValue());
+            for(URI brokerUri : brokerUris) {
+                if (!EMPTY.equals(brokerUri.getPath())) {
+                    results.add(new ValidationResult.Builder().subject(PROP_BROKER_URI.getName()).valid(false)
+                            .explanation("the broker URI cannot have a path. It currently is: " + brokerUri.getPath()).build());
+                }
+                final String scheme = brokerUri.getScheme();
+                if (!isValidEnumIgnoreCase(MqttProtocolScheme.class, scheme)) {
+                    results.add(new ValidationResult.Builder().subject(PROP_BROKER_URI.getName()).valid(false)
+                            .explanation("scheme is invalid. Supported schemes are: " + getSupportedSchemeList()).build());
+                }
+                if (!scheme.equals(brokerUris.get(0).getScheme())) {
+                    results.add(new ValidationResult.Builder().subject(PROP_BROKER_URI.getName()).valid(false).explanation("all URIs should use the same scheme.").build());
+                }
+                if (scheme.equalsIgnoreCase("ssl") && !validationContext.getProperty(PROP_SSL_CONTEXT_SERVICE).isSet()) {
+                    results.add(new ValidationResult.Builder().subject(PROP_SSL_CONTEXT_SERVICE.getName() + " or " + PROP_BROKER_URI.getName()).valid(false)
+                            .explanation("if the 'ssl' scheme is used in the broker URI, the SSL Context Service must be set.").build());
+                }
             }
-        } catch (URISyntaxException e) {
-            results.add(new ValidationResult.Builder().subject(PROP_BROKER_URI.getName()).valid(false).explanation("it is not valid URI syntax.").build());
+        } catch (Exception e) {
+            results.add(new ValidationResult.Builder().subject(PROP_BROKER_URI.getName()).valid(false)
+                    .explanation("it is not valid URI syntax.").build());
         }
 
         final boolean readerIsSet = validationContext.getProperty(BASE_RECORD_READER).isSet();
@@ -343,9 +366,7 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
 
     protected RoundRobinList<URI> getBrokerUris(final ProcessContext context) {
         final String brokerUris = context.getProperty(PROP_BROKER_URI).evaluateAttributeExpressions().getValue();
-        final List<URI> uris = Pattern.compile(",").splitAsStream(brokerUris)
-                .map(this::parseUri)
-                .collect(Collectors.toList());
+        final List<URI> uris = parseBrokerUris(brokerUris);
         return new RoundRobinList<>(uris);
     }
 
@@ -388,7 +409,14 @@ public abstract class AbstractMQTTProcessor extends AbstractSessionFactoryProces
         return clientProperties;
     }
 
-    private URI parseUri(String uri) {
+    private static List<URI> parseBrokerUris(String brokerUris) {
+        final List<URI> uris = Pattern.compile(",").splitAsStream(brokerUris)
+                .map(AbstractMQTTProcessor::parseUri)
+                .collect(Collectors.toList());
+        return uris;
+    }
+
+    private static URI parseUri(String uri) {
         try {
             return new URI(uri);
         } catch (URISyntaxException e) {
