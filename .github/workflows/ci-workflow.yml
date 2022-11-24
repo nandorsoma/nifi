@@ -94,13 +94,13 @@ jobs:
         with:
           path: |
             ~/.m2/repository
-          # Cache Maven modules using a cache key different from setup-java steps
-          key: ${{ runner.os }}-maven-static-analysis-${{ hashFiles('**/pom.xml') }}
-      - name: Set up Java 17
+          # Cache Maven modules that can be used in setup-java steps
+          key: shared-cache-${{ hashFiles('**/pom.xml') }}
+      - name: Set up Java 8
         uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '8'
       - name: Maven Build
         run: >
           mvn validate
@@ -130,6 +130,13 @@ jobs:
             ~/.npm
             **/node_modules
           key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+      - name: Cache Maven Modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2/repository
+          # Using cache created at Static Analysis
+          key: shared-cache-${{ hashFiles('**/pom.xml') }}
       - name: Set up Java 17
         uses: actions/setup-java@v3
         with:
@@ -191,6 +198,13 @@ jobs:
             ~/.npm
             **/node_modules
           key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+      - name: Cache Maven Modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2/repository
+          # Using cache created at Static Analysis
+          key: shared-cache-${{ hashFiles('**/pom.xml') }}
       - name: Set up Java 11
         uses: actions/setup-java@v3
         with:
@@ -252,6 +266,13 @@ jobs:
             ~/.npm
             **/node_modules
           key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+      - name: Cache Maven Modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2/repository
+          # Using cache created at Static Analysis
+          key: shared-cache-${{ hashFiles('**/pom.xml') }}
       - name: Set up Java 8
         uses: actions/setup-java@v3
         with:
@@ -315,6 +336,13 @@ jobs:
             ~\AppData\npm-cache
             **\node_modules
           key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+      - name: Cache Maven Modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2/repository
+          # Using cache created at Static Analysis
+          key: shared-cache-${{ hashFiles('**/pom.xml') }}
       - name: Set up Java 8
         uses: actions/setup-java@v3
         with:
