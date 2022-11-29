@@ -111,6 +111,7 @@ jobs:
           -P include-grpc
 
   ubuntu-build-en:
+    needs: static-analysis
     timeout-minutes: 120
     runs-on: ubuntu-latest
     name: Ubuntu Zulu JDK 17 EN
@@ -179,6 +180,7 @@ jobs:
         run: df
 
   ubuntu-build-hi:
+    needs: static-analysis
     timeout-minutes: 120
     runs-on: ubuntu-latest
     name: Ubuntu Zulu JDK 11 HI
@@ -247,6 +249,7 @@ jobs:
         run: df
 
   macos-build-jp:
+    needs: static-analysis
     timeout-minutes: 120
     runs-on: macos-latest
     name: MacOS Temurin JDK 8 JP
@@ -315,6 +318,7 @@ jobs:
         run: df
 
   windows-build:
+    needs: static-analysis
     timeout-minutes: 120
     runs-on: windows-latest
     name: Windows Zulu JDK 8 FR

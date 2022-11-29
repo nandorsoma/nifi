@@ -147,7 +147,7 @@
         <swagger.annotations.version>1.6.6</swagger.annotations.version>
         <h2.version>2.1.214</h2.version>
         <zookeeper.version>3.8.0</zookeeper.version>
-        <dummy.property>toTriggerCacheEviction</dummy.property>
+        <dummy.property>toTriggerCacheEviction-attempt2</dummy.property>
     </properties>
     <dependencyManagement>
         <dependencies>
