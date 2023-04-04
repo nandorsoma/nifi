@@ -33,11 +33,7 @@ import org.apache.kudu.client.SessionConfiguration;
 import org.apache.nifi.annotation.lifecycle.OnStopped;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.PropertyDescriptor.Builder;
-import org.apache.nifi.components.ValidationContext;
-import org.apache.nifi.components.ValidationResult;
-import org.apache.nifi.expression.AttributeExpression;
 import org.apache.nifi.expression.ExpressionLanguageScope;
-import org.apache.nifi.kerberos.KerberosCredentialsService;
 import org.apache.nifi.kerberos.KerberosUserService;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
@@ -53,16 +49,13 @@ import org.apache.nifi.serialization.record.field.FieldConverter;
 import org.apache.nifi.serialization.record.field.ObjectTimestampFieldConverter;
 import org.apache.nifi.serialization.record.type.DecimalDataType;
 import org.apache.nifi.serialization.record.util.DataTypeUtils;
-import org.apache.nifi.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -87,39 +80,12 @@ public abstract class AbstractKuduProcessor extends AbstractProcessor {
             .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
             .build();
 
-    static final PropertyDescriptor KERBEROS_CREDENTIALS_SERVICE = new Builder()
-            .name("kerberos-credentials-service")
-            .displayName("Kerberos Credentials Service")
-            .description("Specifies the Kerberos Credentials to use for authentication")
-            .required(false)
-            .identifiesControllerService(KerberosCredentialsService.class)
-            .build();
-
     static final PropertyDescriptor KERBEROS_USER_SERVICE = new PropertyDescriptor.Builder()
             .name("kerberos-user-service")
             .displayName("Kerberos User Service")
             .description("Specifies the Kerberos User Controller Service that should be used for authenticating with Kerberos")
             .identifiesControllerService(KerberosUserService.class)
             .required(false)
-            .build();
-
-    static final PropertyDescriptor KERBEROS_PRINCIPAL = new PropertyDescriptor.Builder()
-            .name("kerberos-principal")
-            .displayName("Kerberos Principal")
-            .description("The principal to use when specifying the principal and password directly in the processor for authenticating via Kerberos.")
-            .required(false)
-            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .addValidator(StandardValidators.createAttributeExpressionLanguageValidator(AttributeExpression.ResultType.STRING))
-            .expressionLanguageSupported(ExpressionLanguageScope.VARIABLE_REGISTRY)
-            .build();
-
-    static final PropertyDescriptor KERBEROS_PASSWORD = new PropertyDescriptor.Builder()
-            .name("kerberos-password")
-            .displayName("Kerberos Password")
-            .description("The password to use when specifying the principal and password directly in the processor for authenticating via Kerberos.")
-            .required(false)
-            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
-            .sensitive(true)
             .build();
 
     static final PropertyDescriptor KUDU_OPERATION_TIMEOUT_MS = new Builder()
@@ -191,20 +157,6 @@ public abstract class AbstractKuduProcessor extends AbstractProcessor {
             kerberosUser = kerberosUserService.createKerberosUser();
             kerberosUser.login();
             createKuduClient(context);
-        } else {
-            final KerberosCredentialsService credentialsService = context.getProperty(KERBEROS_CREDENTIALS_SERVICE).asControllerService(KerberosCredentialsService.class);
-            final String kerberosPrincipal = context.getProperty(KERBEROS_PRINCIPAL).evaluateAttributeExpressions().getValue();
-            final String kerberosPassword = context.getProperty(KERBEROS_PASSWORD).getValue();
-
-            if (credentialsService != null) {
-                kerberosUser = createKerberosKeytabUser(credentialsService.getPrincipal(), credentialsService.getKeytab(), context);
-                kerberosUser.login(); // login creates the kudu client as well
-            } else if (!StringUtils.isBlank(kerberosPrincipal) && !StringUtils.isBlank(kerberosPassword)) {
-                kerberosUser = createKerberosPasswordUser(kerberosPrincipal, kerberosPassword, context);
-                kerberosUser.login(); // login creates the kudu client as well
-            } else {
-                createKuduClient(context);
-            }
         }
     }
 
@@ -306,59 +258,6 @@ public abstract class AbstractKuduProcessor extends AbstractProcessor {
                 createKuduClient(context);
             }
         };
-    }
-
-    @Override
-    protected Collection<ValidationResult> customValidate(ValidationContext context) {
-        final List<ValidationResult> results = new ArrayList<>();
-
-        final boolean kerberosPrincipalProvided = !StringUtils.isBlank(context.getProperty(KERBEROS_PRINCIPAL).evaluateAttributeExpressions().getValue());
-        final boolean kerberosPasswordProvided = !StringUtils.isBlank(context.getProperty(KERBEROS_PASSWORD).getValue());
-
-        if (kerberosPrincipalProvided && !kerberosPasswordProvided) {
-            results.add(new ValidationResult.Builder()
-                    .subject(KERBEROS_PASSWORD.getDisplayName())
-                    .valid(false)
-                    .explanation("a password must be provided for the given principal")
-                    .build());
-        }
-
-        if (kerberosPasswordProvided && !kerberosPrincipalProvided) {
-            results.add(new ValidationResult.Builder()
-                    .subject(KERBEROS_PRINCIPAL.getDisplayName())
-                    .valid(false)
-                    .explanation("a principal must be provided for the given password")
-                    .build());
-        }
-
-        final KerberosCredentialsService kerberosCredentialsService = context.getProperty(KERBEROS_CREDENTIALS_SERVICE).asControllerService(KerberosCredentialsService.class);
-        final KerberosUserService kerberosUserService = context.getProperty(KERBEROS_USER_SERVICE).asControllerService(KerberosUserService.class);
-
-        if (kerberosCredentialsService != null && (kerberosPrincipalProvided || kerberosPasswordProvided)) {
-            results.add(new ValidationResult.Builder()
-                    .subject(KERBEROS_CREDENTIALS_SERVICE.getDisplayName())
-                    .valid(false)
-                    .explanation("kerberos principal/password and kerberos credential service cannot be configured at the same time")
-                    .build());
-        }
-
-        if (kerberosUserService != null && (kerberosPrincipalProvided || kerberosPasswordProvided)) {
-            results.add(new ValidationResult.Builder()
-                    .subject(KERBEROS_USER_SERVICE.getDisplayName())
-                    .valid(false)
-                    .explanation("kerberos principal/password and kerberos user service cannot be configured at the same time")
-                    .build());
-        }
-
-        if (kerberosUserService != null && kerberosCredentialsService != null) {
-            results.add(new ValidationResult.Builder()
-                    .subject(KERBEROS_USER_SERVICE.getDisplayName())
-                    .valid(false)
-                    .explanation("kerberos user service and kerberos credentials service cannot be configured at the same time")
-                    .build());
-        }
-
-        return results;
     }
 
     @OnStopped

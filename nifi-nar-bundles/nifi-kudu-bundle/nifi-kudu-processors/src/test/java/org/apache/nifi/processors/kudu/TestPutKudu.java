@@ -148,43 +148,7 @@ public class TestPutKudu {
         testRunner.enableControllerService(readerFactory);
     }
 
-    @Test
-    public void testCustomValidate() throws InitializationException {
-        createRecordReader(1);
-
-        testRunner.setProperty(PutKudu.KERBEROS_PRINCIPAL, "principal");
-        testRunner.assertNotValid();
-
-        testRunner.removeProperty(PutKudu.KERBEROS_PRINCIPAL);
-        testRunner.setProperty(PutKudu.KERBEROS_PASSWORD, "password");
-        testRunner.assertNotValid();
-
-        testRunner.setProperty(PutKudu.KERBEROS_PRINCIPAL, "principal");
-        testRunner.setProperty(PutKudu.KERBEROS_PASSWORD, "password");
-        testRunner.assertValid();
-
-        final KerberosCredentialsService kerberosCredentialsService = new MockKerberosCredentialsService("unit-test-principal", "unit-test-keytab");
-        testRunner.addControllerService("kerb", kerberosCredentialsService);
-        testRunner.enableControllerService(kerberosCredentialsService);
-        testRunner.setProperty(PutKudu.KERBEROS_CREDENTIALS_SERVICE, "kerb");
-        testRunner.assertNotValid();
-
-        testRunner.removeProperty(PutKudu.KERBEROS_PRINCIPAL);
-        testRunner.removeProperty(PutKudu.KERBEROS_PASSWORD);
-        testRunner.assertValid();
-
-        final KerberosUserService kerberosUserService = enableKerberosUserService(testRunner);
-        testRunner.setProperty(PutKudu.KERBEROS_USER_SERVICE, kerberosUserService.getIdentifier());
-        testRunner.assertNotValid();
-
-        testRunner.removeProperty(PutKudu.KERBEROS_CREDENTIALS_SERVICE);
-        testRunner.assertValid();
-
-        testRunner.setProperty(PutKudu.KERBEROS_PRINCIPAL, "principal");
-        testRunner.setProperty(PutKudu.KERBEROS_PASSWORD, "password");
-        testRunner.assertNotValid();
-    }
-
+    //TODO: move to IT test
     private KerberosUserService enableKerberosUserService(final TestRunner runner) throws InitializationException {
         final KerberosUserService kerberosUserService = mock(KerberosUserService.class);
         when(kerberosUserService.getIdentifier()).thenReturn("userService1");
@@ -225,11 +189,12 @@ public class TestPutKudu {
     public void testKerberosEnabled() throws InitializationException {
         createRecordReader(1);
 
+        //TODO: inkabb kerberos user service
         final KerberosCredentialsService kerberosCredentialsService = new MockKerberosCredentialsService("unit-test-principal", "unit-test-keytab");
         testRunner.addControllerService("kerb", kerberosCredentialsService);
         testRunner.enableControllerService(kerberosCredentialsService);
 
-        testRunner.setProperty(PutKudu.KERBEROS_CREDENTIALS_SERVICE, "kerb");
+//        testRunner.setProperty(PutKudu.KERBEROS_CREDENTIALS_SERVICE, "kerb");
 
         testRunner.run(1, false);
 

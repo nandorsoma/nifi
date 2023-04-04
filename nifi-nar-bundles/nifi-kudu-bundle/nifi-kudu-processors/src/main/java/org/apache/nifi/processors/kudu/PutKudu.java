@@ -284,9 +284,6 @@ public class PutKudu extends AbstractKuduProcessor {
         properties.add(TABLE_NAME);
         properties.add(FAILURE_STRATEGY);
         properties.add(KERBEROS_USER_SERVICE);
-        properties.add(KERBEROS_CREDENTIALS_SERVICE);
-        properties.add(KERBEROS_PRINCIPAL);
-        properties.add(KERBEROS_PASSWORD);
         properties.add(SKIP_HEAD_LINE);
         properties.add(LOWERCASE_FIELD_NAMES);
         properties.add(HANDLE_SCHEMA_DRIFT);
