@@ -14,10 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.nifi.jms.processors.ioconcept.reader;
+package org.apache.nifi.record.io.reader;
 
 import org.apache.nifi.flowfile.FlowFile;
-import org.apache.nifi.jms.processors.ioconcept.reader.record.RecordSupplier;
+import org.apache.nifi.record.io.reader.record.RecordSupplier;
 import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.util.StopWatch;

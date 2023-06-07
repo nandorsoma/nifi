@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.nifi.jms.processors.ioconcept.writer.record;
+package org.apache.nifi.record.io.writer.record;
 
 import org.apache.nifi.components.DescribedValue;
 

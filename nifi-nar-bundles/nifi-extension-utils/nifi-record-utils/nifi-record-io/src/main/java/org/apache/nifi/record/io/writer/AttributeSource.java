@@ -14,8 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.nifi.jms.processors.ioconcept.reader;
+package org.apache.nifi.record.io.writer;
 
-public interface MessageHandler {
-    void handle(byte[] content);
+import java.util.Map;
+
+public interface AttributeSource<T> {
+    Map<String, String> getAttributes(T message);
 }

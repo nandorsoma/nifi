@@ -14,10 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.nifi.jms.processors.ioconcept.writer;
+package org.apache.nifi.record.io.reader;
 
-import java.util.Map;
+import org.apache.nifi.flowfile.FlowFile;
+import org.apache.nifi.processor.ProcessSession;
 
-public interface AttributeSource<T> {
-    Map<String, String> getAttributes(T message);
+public interface FlowFileReader {
+    void read(ProcessSession session, FlowFile flowFile, MessageHandler messageHandler, FlowFileReaderCallback flowFileReaderCallback);
 }

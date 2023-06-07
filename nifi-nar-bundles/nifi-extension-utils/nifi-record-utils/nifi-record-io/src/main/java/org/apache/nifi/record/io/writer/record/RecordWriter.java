@@ -14,14 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.nifi.jms.processors.ioconcept.writer.record;
+package org.apache.nifi.record.io.writer.record;
 
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.flowfile.attributes.CoreAttributes;
-import org.apache.nifi.jms.processors.ioconcept.writer.AttributeSource;
-import org.apache.nifi.jms.processors.ioconcept.writer.FlowFileWriter;
-import org.apache.nifi.jms.processors.ioconcept.writer.FlowFileWriterCallback;
-import org.apache.nifi.jms.processors.ioconcept.writer.Marshaller;
+import org.apache.nifi.record.io.writer.AttributeSource;
+import org.apache.nifi.record.io.writer.FlowFileWriter;
+import org.apache.nifi.record.io.writer.FlowFileWriterCallback;
+import org.apache.nifi.record.io.writer.Marshaller;
 import org.apache.nifi.logging.ComponentLog;
 import org.apache.nifi.processor.ProcessSession;
 import org.apache.nifi.serialization.MalformedRecordException;
@@ -44,9 +44,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.apache.nifi.jms.processors.ioconcept.writer.record.OutputStrategy.USE_APPENDER;
-import static org.apache.nifi.jms.processors.ioconcept.writer.record.OutputStrategy.USE_VALUE;
-import static org.apache.nifi.jms.processors.ioconcept.writer.record.OutputStrategy.USE_WRAPPER;
+import static org.apache.nifi.record.io.writer.record.OutputStrategy.USE_APPENDER;
+import static org.apache.nifi.record.io.writer.record.OutputStrategy.USE_VALUE;
+import static org.apache.nifi.record.io.writer.record.OutputStrategy.USE_WRAPPER;
 
 public class RecordWriter<T> implements FlowFileWriter<T> {
 

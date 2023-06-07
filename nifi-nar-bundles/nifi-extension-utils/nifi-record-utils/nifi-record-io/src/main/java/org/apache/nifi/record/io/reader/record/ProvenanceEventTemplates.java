@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.nifi.jms.processors.ioconcept.reader.record;
+package org.apache.nifi.record.io.reader.record;
 
 public class ProvenanceEventTemplates {
 
